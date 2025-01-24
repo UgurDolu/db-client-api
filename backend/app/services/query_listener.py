@@ -71,7 +71,7 @@ class QueryListener:
                     # Find queries that are in PENDING status
                     result = await db.execute(
                         select(Query)
-                        .where(Query.status == QueryStatus.PENDING.value)
+                        .where(Query.status == "pending")
                         .order_by(Query.created_at.asc())
                         .with_for_update(skip_locked=True)
                     )
@@ -89,7 +89,7 @@ class QueryListener:
                             )
                             
                             # Add query to queue manager
-                            await queue_manager.add_query(query, db)
+                            await queue_manager.add_query(query.id, query.user_id)
                             queries_processed += 1
                             self._total_queries_processed += 1
                             

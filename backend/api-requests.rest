@@ -16,10 +16,6 @@ Content-Type: application/x-www-form-urlencoded
 
 username=ugur@gmail.com&password=deneme
 
-### Get current user
-GET http://localhost:8000/api/auth/me
-Authorization: Bearer YOUR_JWT_TOKEN
-
 ### User Management Endpoints
 
 ### Get all users
@@ -52,11 +48,12 @@ POST http://localhost:8000/api/queries/
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4
 Content-Type: application/json
 
-{
+{   
     "db_username": "t088503",
     "db_password": "hilaL250202",
     "db_tns": "localhost:1521/XE",
-    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 250"
+    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 250",
+    "export_type": "excel"
 }
 
 ### Get Query Stats
@@ -65,4 +62,8 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtY
 
 ### Get Current Stats
 GET http://localhost:8000/api/queries/stats/current
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4
+
+### Delete Query
+DELETE http://localhost:8000/api/queries/88
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4

@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import Optional, Any, Dict, Union
+from typing import Optional, Any, Dict, Union, List, ClassVar
 import secrets
 from pydantic import validator
 import os
@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     DEFAULT_QUEUE_TIMEOUT: int = 3600  # 1 hour
     
     # Export Settings
+    VALID_EXPORT_TYPES: ClassVar[List[str]] = ["csv", "excel", "json", "feather"]
     DEFAULT_EXPORT_TYPE: str = "csv"
     DEFAULT_EXPORT_LOCATION: str = "./exports"
     TMP_EXPORT_LOCATION: str = "./tmp/exports"  # Temporary storage for query results

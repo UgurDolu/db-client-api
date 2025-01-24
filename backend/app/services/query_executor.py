@@ -31,7 +31,8 @@ class QueryExecutor:
         self.db_password = query.db_password
         self.db_tns = query.db_tns
         self.query_text = query.query_text
-        logger.info(f"Initialized QueryExecutor for query {self.query_id}")
+        self.export_type = query.export_type.lower() if query.export_type else "csv"
+        logger.info(f"Initialized QueryExecutor for query {self.query_id} with export type: {self.export_type}")
 
     async def connect(self) -> bool:
         try:
@@ -58,9 +59,15 @@ class QueryExecutor:
                 QueryStatus.FAILED,
                 error_message=f"Connection error: {str(e)}"
             )
+            if self.connection:
+                try:
+                    self.connection.close()
+                except:
+                    pass
             return False
 
     async def execute(self) -> bool:
+        cursor = None
         try:
             logger.info(f"Starting execution of query {self.query_id}")
             await self._update_query_status(QueryStatus.RUNNING)
@@ -87,19 +94,10 @@ class QueryExecutor:
             df = pd.DataFrame(rows, columns=columns)
             logger.info(f"DataFrame created with {len(df)} rows and {len(df.columns)} columns")
             
-            # Generate temporary file path with timestamp and query ID
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f"query_{self.query_id}_{timestamp}.csv"
-            logger.info(f"Generated filename: {filename}")
-            
-            # Get tmp path (this will create the directory if needed)
-            tmp_file_path = file_transfer_service.get_tmp_path(filename)
-            logger.info(f"Using temporary path: {tmp_file_path}")
-            
-            # Save as CSV
-            logger.info(f"Saving DataFrame to CSV for query {self.query_id}")
-            df.to_csv(tmp_file_path, index=False)
-            logger.info(f"Saved query results to: {tmp_file_path}")
+            # Save results using the _save_results method
+            logger.info(f"Saving results for query {self.query_id} with export type: {self.export_type}")
+            tmp_file_path = await self._save_results(df)
+            logger.info(f"Saved query results to temporary file: {tmp_file_path}")
             
             # Prepare metadata
             file_size = os.path.getsize(tmp_file_path)
@@ -108,16 +106,20 @@ class QueryExecutor:
                 "rows": len(df),
                 "columns": len(df.columns),
                 "file_size": file_size,
-                "tmp_file_path": tmp_file_path  # Include tmp path in metadata for development
+                "tmp_file_path": tmp_file_path
             }
             logger.info(f"Prepared metadata: {metadata}")
             
-            # Use default export location for development
+            # Create final export directory if it doesn't exist
             export_path = os.path.join("exports", str(self.user_id))
+            os.makedirs(export_path, exist_ok=True)
+            
+            # Use the same filename but in the exports directory
+            filename = os.path.basename(tmp_file_path)
             remote_file_path = os.path.join(export_path, filename)
             logger.info(f"Using export path: {remote_file_path}")
             
-            logger.info(f"Starting file transfer for query {self.query_id}")
+            logger.info(f"Starting file transfer from {tmp_file_path} to {remote_file_path}")
             transfer_success = await file_transfer_service.transfer_file(
                 tmp_file_path,
                 remote_file_path,
@@ -131,8 +133,12 @@ class QueryExecutor:
                     QueryStatus.COMPLETED,
                     result_metadata=metadata
                 )
-                # Don't clean up tmp file in development
-                # file_transfer_service.cleanup_tmp_file(tmp_file_path)
+                # Clean up temporary file
+                try:
+                    os.remove(tmp_file_path)
+                    logger.info(f"Cleaned up temporary file: {tmp_file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up temporary file {tmp_file_path}: {str(e)}")
                 return True
             else:
                 logger.error(f"File transfer failed for query {self.query_id}")
@@ -141,7 +147,7 @@ class QueryExecutor:
                     error_message="Failed to transfer results file"
                 )
                 return False
-            
+
         except Exception as e:
             logger.error(f"Error executing query {self.query_id}: {str(e)}", exc_info=True)
             await self._update_query_status(
@@ -151,9 +157,16 @@ class QueryExecutor:
             return False
             
         finally:
+            if cursor:
+                try:
+                    cursor.close()
+                except:
+                    pass
             if self.connection:
-                logger.info(f"Closing Oracle connection for query {self.query_id}")
-                self.connection.close()
+                try:
+                    self.connection.close()
+                except:
+                    pass
 
     async def _update_query_status(
         self,
@@ -162,29 +175,66 @@ class QueryExecutor:
         result_metadata: Optional[Dict[str, Any]] = None
     ):
         logger.info(f"Updating status for query {self.query_id} to {status}")
-        # Create a new session for this update
-        async with AsyncSession(self.db.bind) as session:
-            async with session.begin():
-                # Get fresh copy of the query
-                result = await session.execute(
-                    select(Query).where(Query.id == self.query_id)
-                )
-                query = result.scalar_one()
-                
-                # Update query object
-                query.status = status
-                if error_message:
-                    query.error_message = error_message
-                if result_metadata:
-                    query.result_metadata = result_metadata
-                
-                if status == QueryStatus.RUNNING:
-                    query.started_at = datetime.utcnow()
-                elif status in [QueryStatus.COMPLETED, QueryStatus.FAILED]:
-                    query.completed_at = datetime.utcnow()
-                
-                await session.commit()
-                logger.info(f"Status updated successfully for query {self.query_id}")
-                
-                # Update our reference
-                self.query = query 
+        try:
+            # Create a new session for this update
+            async with AsyncSession(self.db.bind) as session:
+                async with session.begin():
+                    # Get fresh copy of the query
+                    result = await session.execute(
+                        select(Query).where(Query.id == self.query_id)
+                    )
+                    query = result.scalar_one()
+                    
+                    # Update query object
+                    query.status = status
+                    if error_message:
+                        query.error_message = error_message
+                    if result_metadata:
+                        query.result_metadata = result_metadata
+                    
+                    if status == QueryStatus.RUNNING:
+                        query.started_at = datetime.utcnow()
+                    elif status in [QueryStatus.COMPLETED, QueryStatus.FAILED]:
+                        query.completed_at = datetime.utcnow()
+                    
+                    await session.commit()
+                    logger.info(f"Status updated successfully for query {self.query_id}")
+                    
+                    # Update our reference
+                    self.query = query
+        except Exception as e:
+            logger.error(f"Error updating query status: {str(e)}", exc_info=True)
+            # If we can't update the status, we should still try to proceed
+            # The query might complete but the status update failed 
+
+    async def _save_results(self, df: pd.DataFrame) -> str:
+        """Save query results to a file and return the file path"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Create temp directory if it doesn't exist
+        temp_dir = os.path.join("tmp", "exports", str(self.user_id))
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Generate filename based on export type
+        filename = f"query_{self.query_id}_{timestamp}"
+        
+        if self.export_type == "csv":
+            filepath = os.path.join(temp_dir, f"{filename}.csv")
+            df.to_csv(filepath, index=False)
+        elif self.export_type == "excel":
+            filepath = os.path.join(temp_dir, f"{filename}.xlsx")
+            df.to_excel(filepath, index=False)
+        elif self.export_type == "json":
+            filepath = os.path.join(temp_dir, f"{filename}.json")
+            df.to_json(filepath, orient="records")
+        elif self.export_type == "feather":
+            filepath = os.path.join(temp_dir, f"{filename}.feather")
+            df.to_feather(filepath)
+        else:
+            # Default to CSV if export type is not recognized
+            filepath = os.path.join(temp_dir, f"{filename}.csv")
+            df.to_csv(filepath, index=False)
+            logger.warning(f"Unrecognized export type '{self.export_type}', defaulting to CSV")
+        
+        logger.info(f"Saved query results to temporary file: {filepath}")
+        return filepath 
