@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env
+.venv
+.dbapi/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.project
+.pydevproject
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# Project specific
+exports/
+logs/
+*.log
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.pyre/
+.dmypy.json
+dmypy.json
+
+# Database
+*.sqlite3
+*.db
+
+# OS specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Alembic
+alembic.ini
+alembic/versions/__pycache__/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Local development
+local_settings.py
+*.env.local
+*.env.development.local
+*.env.test.local
+*.env.production.local 

@@ -1,0 +1,3 @@
+- use python fastapi for api
+- use python sqlalchemy for database
+- use jwt for authentication

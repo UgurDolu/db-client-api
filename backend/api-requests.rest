@@ -1,0 +1,68 @@
+### Authentication Endpoints
+
+### Register new user
+POST http://localhost:8000/api/auth/register
+Content-Type: application/json
+
+{
+    "email": "salih@gmail.com",
+    "password": "deneme",
+    "full_name": "deneme"
+}
+
+### Login
+POST http://localhost:8000/api/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=ugur@gmail.com&password=deneme
+
+### Get current user
+GET http://localhost:8000/api/auth/me
+Authorization: Bearer YOUR_JWT_TOKEN
+
+### User Management Endpoints
+
+### Get all users
+GET http://localhost:8000/api/users/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzc1NDYxOX0.O2kKQrTU2aikEEfMuyXMQ-5DwkTtdV_g2yTXeCBTS-Y
+
+### Get specific user
+GET http://localhost:8000/api/users/me/settings
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzc1NDYxOX0.O2kKQrTU2aikEEfMuyXMQ-5DwkTtdV_g2yTXeCBTS-Y
+
+### Update user
+PUT http://localhost:8000/api/users/me/settings
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzc1NDYxOX0.O2kKQrTU2aikEEfMuyXMQ-5DwkTtdV_g2yTXeCBTS-Y
+
+{
+    "export_location": "./exports",
+    "export_type": "feather",
+    "max_parallel_queries": 10
+}
+
+### Database Query Endpoints
+
+### List queries
+GET http://localhost:8000/api/queries/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzc1NDYxOX0.O2kKQrTU2aikEEfMuyXMQ-5DwkTtdV_g2yTXeCBTS-Y
+
+### Post New Query
+POST http://localhost:8000/api/queries/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzc1NDYxOX0.O2kKQrTU2aikEEfMuyXMQ-5DwkTtdV_g2yTXeCBTS-Y
+Content-Type: application/json
+
+{
+    "db_username": "t088503",
+    "db_password": "hilaL250202",
+    "db_tns": "EDWLIVE",
+    "query_text": "Select * from t088503.t088503_test"
+}
+
+### Get Query Stats
+GET http://localhost:8000/api/queries/4
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzc1NDYxOX0.O2kKQrTU2aikEEfMuyXMQ-5DwkTtdV_g2yTXeCBTS-Y
+
+### Get Current Stats
+GET http://localhost:8000/api/queries/stats/current
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzc1NDYxOX0.O2kKQrTU2aikEEfMuyXMQ-5DwkTtdV_g2yTXeCBTS-Y
