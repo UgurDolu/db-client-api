@@ -56,7 +56,7 @@ Content-Type: application/json
     "db_username": "t088503",
     "db_password": "hilaL250202",
     "db_tns": "localhost:1521/XE",
-    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 5"
+    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 250"
 }
 
 ### Get Query Stats
