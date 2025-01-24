@@ -28,8 +28,7 @@ class QueryExecutor:
             self.connection = oracledb.connect(
                 user=self.query.db_username,
                 password=self.query.db_password,
-                dsn=self.query.db_tns,
-                encoding="UTF-8"
+                dsn=self.query.db_tns
             )
             return True
         except Exception as e:
@@ -125,16 +124,28 @@ class QueryExecutor:
         error_message: Optional[str] = None,
         result_metadata: Optional[Dict[str, Any]] = None
     ):
-        self.query.status = status
-        if error_message:
-            self.query.error_message = error_message
-        if result_metadata:
-            self.query.result_metadata = result_metadata
-        
-        if status == QueryStatus.RUNNING:
-            self.query.started_at = datetime.utcnow()
-        elif status in [QueryStatus.COMPLETED, QueryStatus.FAILED]:
-            self.query.completed_at = datetime.utcnow()
-        
-        await self.db.commit()
-        await self.db.refresh(self.query) 
+        # Create a new session for this update
+        async with AsyncSession(self.db.bind) as session:
+            async with session.begin():
+                # Get fresh copy of the query
+                result = await session.execute(
+                    select(Query).where(Query.id == self.query.id)
+                )
+                query = result.scalar_one()
+                
+                # Update query object
+                query.status = status
+                if error_message:
+                    query.error_message = error_message
+                if result_metadata:
+                    query.result_metadata = result_metadata
+                
+                if status == QueryStatus.RUNNING:
+                    query.started_at = datetime.utcnow()
+                elif status in [QueryStatus.COMPLETED, QueryStatus.FAILED]:
+                    query.completed_at = datetime.utcnow()
+                
+                await session.commit()
+                
+                # Update our reference
+                self.query = query 

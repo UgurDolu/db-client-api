@@ -34,18 +34,17 @@ services:
       retries: 3
 
   postgres:
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: db_client_postgres
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-db_client}
-      PGDATA: /var/lib/postgresql/data/pgdata
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/pgdata
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: db_client
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-db_client}"]
       interval: 10s
@@ -55,9 +54,27 @@ services:
     networks:
       - db_client_network
 
+  oracle:
+    image: container-registry.oracle.com/database/express:21.3.0-xe
+    environment:
+      ORACLE_PWD: oracle123
+      ORACLE_CHARACTERSET: AL32UTF8
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./docker/oracle/init:/docker-entrypoint-initdb.d/startup
+    healthcheck:
+      test: ["CMD", "sqlplus", "-L", "sys/oracle123@//localhost:1521/XE as sysdba", "@/docker-entrypoint-initdb.d/startup/healthcheck.sql"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
 networks:
   db_client_network:
     driver: bridge
 
 volumes:
-  postgres_data: 
+  postgres_data:
+  oracle_data: 

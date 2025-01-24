@@ -65,44 +65,48 @@ class QueryListener:
         Returns the number of queries processed."""
         queries_processed = 0
         
-        async with AsyncSessionLocal() as db:
-            try:
-                # Find queries that are in PENDING status
-                result = await db.execute(
-                    select(Query)
-                    .where(Query.status == QueryStatus.PENDING.value)
-                    .order_by(Query.created_at.asc())
-                )
-                pending_queries = result.scalars().all()
-                
-                if pending_queries:
-                    logger.info(f"Found {len(pending_queries)} pending queries")
+        try:
+            async with AsyncSessionLocal() as db:
+                async with db.begin():
+                    # Find queries that are in PENDING status
+                    result = await db.execute(
+                        select(Query)
+                        .where(Query.status == QueryStatus.PENDING.value)
+                        .order_by(Query.created_at.asc())
+                        .with_for_update(skip_locked=True)
+                    )
+                    pending_queries = result.scalars().all()
+                    
+                    if pending_queries:
+                        logger.info(f"Found {len(pending_queries)} pending queries")
 
-                # Process each pending query
-                for query in pending_queries:
-                    try:
-                        logger.debug(
-                            f"Processing query {query.id} "
-                            f"(created: {query.created_at.isoformat()})"
-                        )
+                    # Process each pending query
+                    for query in pending_queries:
+                        try:
+                            logger.debug(
+                                f"Processing query {query.id} "
+                                f"(created: {query.created_at.isoformat()})"
+                            )
+                            
+                            # Add query to queue manager
+                            await queue_manager.add_query(query, db)
+                            queries_processed += 1
+                            self._total_queries_processed += 1
+                            
+                            logger.info(
+                                f"Successfully queued query {query.id} "
+                                f"(user: {query.user_id}, db: {query.db_tns})"
+                            )
+                        except Exception as e:
+                            logger.error(
+                                f"Error processing query {query.id}: {str(e)}", 
+                                exc_info=True
+                            )
+                    
+                    # Transaction will be automatically committed here
                         
-                        # Add query to queue manager
-                        await queue_manager.add_query(query, db)
-                        queries_processed += 1
-                        self._total_queries_processed += 1
-                        
-                        logger.info(
-                            f"Successfully queued query {query.id} "
-                            f"(user: {query.user_id}, db: {query.db_tns})"
-                        )
-                    except Exception as e:
-                        logger.error(
-                            f"Error processing query {query.id}: {str(e)}", 
-                            exc_info=True
-                        )
-                        
-            except Exception as e:
-                logger.error(f"Database error in check_queries: {str(e)}", exc_info=True)
+        except Exception as e:
+            logger.error(f"Database error in check_queries: {str(e)}", exc_info=True)
                 
         return queries_processed
 
