@@ -16,19 +16,28 @@ class QueueManager:
     def __init__(self):
         self.queued_queries = asyncio.Queue()
         self.running_queries = set()
-        self.max_parallel_queries = getattr(settings, 'DEFAULT_MAX_PARALLEL_QUERIES', 3)  # Default to 3 if not set
+        self.all_tracked_queries = set()  # Track all queries that are either queued or running
+        self.max_parallel_queries = getattr(settings, 'DEFAULT_MAX_PARALLEL_QUERIES', 3)
         self._processing = False
         self._lock = asyncio.Lock()
         logger.info(f"Initialized QueueManager with max parallel queries: {self.max_parallel_queries}")
 
     async def add_query(self, query_id: int, user_id: int):
-        """Add a query to the queue"""
-        logger.info(f"Adding query {query_id} to queue for user {user_id}")
-        await self.queued_queries.put((query_id, user_id))
-        
-        # Start processing if not already running
-        if not self._processing:
-            asyncio.create_task(self._process_queue())
+        """Add a query to the queue if it's not already being processed"""
+        async with self._lock:
+            # Check if query is already being tracked
+            if query_id in self.all_tracked_queries:
+                logger.warning(f"Query {query_id} is already in queue or running, skipping")
+                return
+            
+            # Add to tracking set and queue
+            self.all_tracked_queries.add(query_id)
+            logger.info(f"Adding query {query_id} to queue for user {user_id}")
+            await self.queued_queries.put((query_id, user_id))
+            
+            # Start processing if not already running
+            if not self._processing:
+                asyncio.create_task(self._process_queue())
 
     async def _process_queue(self):
         """Process queries in the queue"""
@@ -111,8 +120,9 @@ class QueueManager:
         except Exception as e:
             logger.error(f"Error executing query {query_id}: {str(e)}", exc_info=True)
         finally:
-            # Remove from running queries set
+            # Remove from running queries set and tracking set
             self.running_queries.discard(query_id)
+            self.all_tracked_queries.discard(query_id)
             logger.info(f"Completed execution of query {query_id}")
             
             # Check if we need to restart queue processing
