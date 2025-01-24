@@ -210,19 +210,29 @@ class QueryExecutor:
     async def _save_results(self, df: pd.DataFrame) -> str:
         """Save DataFrame to file based on export type"""
         try:
-            # Create export directory if it doesn't exist
-            os.makedirs(self.export_path, exist_ok=True)
+            # Create temp directory for exports
+            temp_dir = os.path.join("tmp", "exports", str(self.user_id))
+            os.makedirs(temp_dir, exist_ok=True)
             
             # Generate filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"query_{self.query.id}_{timestamp}.{self.export_type}"
-            filepath = os.path.join(self.export_path, filename)
+            # Use correct file extension for Excel
+            if self.export_type == 'excel':
+                extension = 'xlsx'
+            else:
+                extension = self.export_type
+            filename = f"query_{self.query_id}_{timestamp}.{extension}"
+            filepath = os.path.join(temp_dir, filename)
             
             # Save based on export type
             if self.export_type == 'csv':
                 df.to_csv(filepath, index=False)
             elif self.export_type == 'excel':
-                df.to_excel(filepath, index=False)
+                try:
+                    df.to_excel(filepath, index=False, engine='openpyxl')
+                except ImportError:
+                    logger.error("openpyxl not installed. Required for Excel export.")
+                    raise ValueError("Excel export requires openpyxl to be installed")
             elif self.export_type == 'json':
                 df.to_json(filepath, orient='records')
             elif self.export_type == 'feather':
@@ -235,15 +245,15 @@ class QueryExecutor:
             self.query.result_metadata = {
                 'file_path': filepath,
                 'file_size': file_size,  # in bytes
-                'row_count': len(df),
-                'column_count': len(df.columns),
-                'columns': list(df.columns)
+                'rows': len(df),
+                'columns': len(df.columns),
+                'column_names': list(df.columns)
             }
             
             logger.info(f"Saved query results to {filepath}")
             logger.info(f"Result metadata: {self.query.result_metadata}")
             
-            return True
+            return filepath
         except Exception as e:
             logger.error(f"Error saving results: {str(e)}", exc_info=True)
-            return False 
+            raise 
