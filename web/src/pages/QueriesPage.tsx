@@ -63,6 +63,8 @@ interface Query {
   completed_at: string | null;
   error_message: string | null;
   result_metadata: any;
+  export_type?: string;
+  export_location?: string;
 }
 
 interface NewQuery {
@@ -138,6 +140,12 @@ const getStatusText = (status: string) => {
     default:
       return status;
   }
+};
+
+const formatFileSize = (bytes: number): string => {
+  if (!bytes) return '0 MB';
+  const mb = bytes / (1024 * 1024);
+  return `${mb.toFixed(2)} MB`;
 };
 
 export default function QueriesPage() {
@@ -1128,16 +1136,61 @@ export default function QueriesPage() {
                         Result Information
                       </Typography>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        {Object.entries(calculateQueryDurations(selectedQuery).metadata).map(([key, value]) => (
-                          <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <Typography variant="body2" color="text.secondary">
-                              {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}:
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Row Count:
+                          </Typography>
+                          <Typography variant="body2">
+                            {selectedQuery.result_metadata?.rows || 0}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Column Count:
+                          </Typography>
+                          <Typography variant="body2">
+                            {selectedQuery.result_metadata?.columns || 0}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            File Size:
+                          </Typography>
+                          <Typography variant="body2">
+                            {formatFileSize(selectedQuery.result_metadata?.file_size || 0)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+
+                {/* Export Information */}
+                <Grid item xs={12} md={6}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="subtitle1" gutterBottom>
+                        Export Information
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Export Type:
+                          </Typography>
+                          <Typography variant="body2">
+                            {selectedQuery.export_type?.toUpperCase() || 'Default (CSV)'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Export Location:
+                          </Typography>
+                          <Tooltip title={selectedQuery.export_location || 'Default Location'}>
+                            <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                              {selectedQuery.export_location || 'Default Location'}
                             </Typography>
-                            <Typography variant="body2">
-                              {value}
-                            </Typography>
-                          </Box>
-                        ))}
+                          </Tooltip>
+                        </Box>
                       </Box>
                     </CardContent>
                   </Card>

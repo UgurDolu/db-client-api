@@ -208,33 +208,42 @@ class QueryExecutor:
             # The query might complete but the status update failed 
 
     async def _save_results(self, df: pd.DataFrame) -> str:
-        """Save query results to a file and return the file path"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Create temp directory if it doesn't exist
-        temp_dir = os.path.join("tmp", "exports", str(self.user_id))
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        # Generate filename based on export type
-        filename = f"query_{self.query_id}_{timestamp}"
-        
-        if self.export_type == "csv":
-            filepath = os.path.join(temp_dir, f"{filename}.csv")
-            df.to_csv(filepath, index=False)
-        elif self.export_type == "excel":
-            filepath = os.path.join(temp_dir, f"{filename}.xlsx")
-            df.to_excel(filepath, index=False)
-        elif self.export_type == "json":
-            filepath = os.path.join(temp_dir, f"{filename}.json")
-            df.to_json(filepath, orient="records")
-        elif self.export_type == "feather":
-            filepath = os.path.join(temp_dir, f"{filename}.feather")
-            df.to_feather(filepath)
-        else:
-            # Default to CSV if export type is not recognized
-            filepath = os.path.join(temp_dir, f"{filename}.csv")
-            df.to_csv(filepath, index=False)
-            logger.warning(f"Unrecognized export type '{self.export_type}', defaulting to CSV")
-        
-        logger.info(f"Saved query results to temporary file: {filepath}")
-        return filepath 
+        """Save DataFrame to file based on export type"""
+        try:
+            # Create export directory if it doesn't exist
+            os.makedirs(self.export_path, exist_ok=True)
+            
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"query_{self.query.id}_{timestamp}.{self.export_type}"
+            filepath = os.path.join(self.export_path, filename)
+            
+            # Save based on export type
+            if self.export_type == 'csv':
+                df.to_csv(filepath, index=False)
+            elif self.export_type == 'excel':
+                df.to_excel(filepath, index=False)
+            elif self.export_type == 'json':
+                df.to_json(filepath, orient='records')
+            elif self.export_type == 'feather':
+                df.to_feather(filepath)
+            
+            # Get file size in bytes
+            file_size = os.path.getsize(filepath)
+            
+            # Update query with result metadata
+            self.query.result_metadata = {
+                'file_path': filepath,
+                'file_size': file_size,  # in bytes
+                'row_count': len(df),
+                'column_count': len(df.columns),
+                'columns': list(df.columns)
+            }
+            
+            logger.info(f"Saved query results to {filepath}")
+            logger.info(f"Result metadata: {self.query.result_metadata}")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error saving results: {str(e)}", exc_info=True)
+            return False 
