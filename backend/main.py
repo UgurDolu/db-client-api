@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.endpoints import auth, users, queries
+from app.services.query_listener import query_listener
+import asyncio
 
 app = FastAPI(
     title="DB Client API",
@@ -23,6 +25,16 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(queries.router, prefix="/api/queries", tags=["Queries"])
+
+@app.on_event("startup")
+async def startup_event():
+    # Start query listener in the background
+    asyncio.create_task(query_listener.start())
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    # Stop query listener
+    await query_listener.stop()
 
 @app.get("/")
 async def root():

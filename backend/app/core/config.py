@@ -1,6 +1,9 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, Any, Dict, Union
 import secrets
+from pydantic import validator
+import os
+import sys
 
 
 class Settings(BaseSettings):
@@ -26,7 +29,27 @@ class Settings(BaseSettings):
     # Export Settings
     DEFAULT_EXPORT_TYPE: str = "csv"
     DEFAULT_EXPORT_LOCATION: str = "./exports"
+    TMP_EXPORT_LOCATION: str = "./tmp/exports"  # Temporary storage for query results
     
+    # SCP Settings
+    SCP_HOST: str = "localhost"
+    SCP_PORT: int = 22
+    SCP_USER: str = ""
+    SCP_PASSWORD: str = ""
+    SCP_KEY_FILE: Optional[str] = None  # Path to private key file for SSH authentication
+
+    # Query Listener Settings
+    QUERY_LISTENER_CHECK_INTERVAL: int = 5  # seconds
+    QUERY_LISTENER_LOG_LEVEL: str = "INFO"
+    
+    @validator("ACCESS_TOKEN_EXPIRE_MINUTES", pre=True)
+    def parse_token_expire(cls, value: Union[str, int]) -> int:
+        if isinstance(value, str):
+            # Remove comments and convert to int
+            clean_value = value.split('#')[0].strip()
+            return int(clean_value)
+        return value
+
     @property
     def get_database_url(self) -> str:
         if self.SQLALCHEMY_DATABASE_URI:
