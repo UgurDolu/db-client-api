@@ -32,12 +32,13 @@ class Settings(BaseSettings):
     DEFAULT_EXPORT_LOCATION: str = "./exports"
     TMP_EXPORT_LOCATION: str = "./tmp/exports"  # Temporary storage for query results
     
-    # SCP Settings
-    SCP_HOST: str = "localhost"
-    SCP_PORT: int = 22
-    SCP_USER: str = ""
-    SCP_PASSWORD: str = ""
-    SCP_KEY_FILE: Optional[str] = None  # Path to private key file for SSH authentication
+    # SSH Settings
+    SSH_HOST: str = "localhost"
+    SSH_PORT: int = 2222
+    SSH_USERNAME: str = "testuser"
+    SSH_PASSWORD: str = "testpass"
+    SSH_KEY_FILE: Optional[str] = None  # Path to private key file for SSH authentication
+    SSH_KEY_PASSPHRASE: Optional[str] = None  # Optional passphrase for SSH key
 
     # Query Listener Settings
     QUERY_LISTENER_CHECK_INTERVAL: int = 5  # seconds

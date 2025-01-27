@@ -54,7 +54,7 @@ export default function UserSettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const response = await axios.get<UserSettings>('http://localhost:8000/api/users/settings', {
+      const response = await axios.get<UserSettings>('http://localhost:8000/api/users/me/settings', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
@@ -74,7 +74,7 @@ export default function UserSettingsPage() {
     setError('');
     try {
       await axios.put(
-        'http://localhost:8000/api/users/settings',
+        'http://localhost:8000/api/users/me/settings',
         settings,
         {
           headers: {

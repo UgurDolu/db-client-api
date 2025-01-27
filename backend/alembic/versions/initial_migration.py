@@ -2,7 +2,7 @@
 
 Revision ID: 001
 Revises: 
-Create Date: 2024-01-23
+Create Date: 2024-01-23 21:31:00.000000
 
 """
 from alembic import op
@@ -36,10 +36,15 @@ def upgrade() -> None:
         sa.Column('export_location', sa.String(), nullable=True),
         sa.Column('export_type', sa.String(), nullable=True),
         sa.Column('max_parallel_queries', sa.Integer(), nullable=True),
+        sa.Column('ssh_username', sa.String(), nullable=True),
+        sa.Column('ssh_password', sa.String(), nullable=True),
+        sa.Column('ssh_key', sa.String(), nullable=True),
+        sa.Column('ssh_key_passphrase', sa.String(), nullable=True),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
         sa.PrimaryKeyConstraint('id'),
     )
     op.create_index('ix_user_settings_id', 'user_settings', ['id'])
+    op.create_index('ix_user_settings_user_id', 'user_settings', ['user_id'], unique=False)
 
     # Create queries table
     op.create_table(
@@ -67,6 +72,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index('ix_queries_id', 'queries')
     op.drop_table('queries')
+    op.drop_index('ix_user_settings_user_id', 'user_settings')
     op.drop_index('ix_user_settings_id', 'user_settings')
     op.drop_table('user_settings')
     op.drop_index('ix_users_email', 'users')

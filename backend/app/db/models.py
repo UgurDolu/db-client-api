@@ -44,6 +44,12 @@ class UserSettings(Base):
     export_type: Mapped[Optional[str]] = Column(String)
     max_parallel_queries: Mapped[Optional[int]] = Column(Integer)
     
+    # SSH Settings
+    ssh_username: Mapped[Optional[str]] = Column(String)
+    ssh_password: Mapped[Optional[str]] = Column(String)
+    ssh_key: Mapped[Optional[str]] = Column(String)  # Store the SSH key content or path
+    ssh_key_passphrase: Mapped[Optional[str]] = Column(String)
+    
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="settings")
 

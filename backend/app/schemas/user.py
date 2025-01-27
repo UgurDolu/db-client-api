@@ -14,6 +14,10 @@ class UserSettings(BaseModel):
     export_location: Optional[str] = None
     export_type: Optional[str] = None
     max_parallel_queries: Optional[int] = None
+    ssh_username: Optional[str] = None
+    ssh_password: Optional[str] = None
+    ssh_key: Optional[str] = None
+    ssh_key_passphrase: Optional[str] = None
 
     class Config:
         from_attributes = True
