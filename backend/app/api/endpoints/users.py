@@ -1,53 +1,89 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
-from app.schemas.user import User, UserSettings
-from app.db.models import User as UserModel, UserSettings as UserSettingsModel
-from app.api.endpoints.auth import get_current_user
-from sqlalchemy import select
+from app.core.auth import get_current_user
+from app.schemas.user import User, UserSettings, SSHSettingsUpdate
+from app.services.file_transfer import FileTransferService
+from app.crud.user import update_user_settings, get_user_settings
+from typing import List
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
-@router.get("/me", response_model=User)
-async def read_user_me(current_user: UserModel = Depends(get_current_user)):
-    return current_user
-
-@router.get("/me/settings", response_model=UserSettings)
+@router.get("/settings", response_model=UserSettings)
 async def read_user_settings(
-    current_user: UserModel = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(
-        select(UserSettingsModel).where(UserSettingsModel.user_id == current_user.id)
-    )
-    settings = result.scalar_one_or_none()
+    """Get current user's settings"""
+    settings = await get_user_settings(db, current_user.id)
     if not settings:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Settings not found"
-        )
+        raise HTTPException(status_code=404, detail="Settings not found")
     return settings
 
-@router.put("/me/settings", response_model=UserSettings)
-async def update_user_settings(
-    settings_update: UserSettings,
-    current_user: UserModel = Depends(get_current_user),
+@router.put("/settings", response_model=UserSettings)
+async def update_user_settings_endpoint(
+    settings: UserSettings,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(
-        select(UserSettingsModel).where(UserSettingsModel.user_id == current_user.id)
-    )
-    settings = result.scalar_one_or_none()
-    if not settings:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Settings not found"
+    """Update user's settings"""
+    try:
+        # Validate export type if provided
+        if settings.export_type:
+            from app.core.config import settings as app_settings
+            if settings.export_type not in app_settings.VALID_EXPORT_TYPES:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid export type. Valid types are: {app_settings.VALID_EXPORT_TYPES}"
+                )
+
+        # Update settings in database
+        updated_settings = await update_user_settings(
+            db,
+            current_user.id,
+            {
+                "export_type": settings.export_type,
+                "export_location": settings.export_location,
+                "max_parallel_queries": settings.max_parallel_queries,
+                "ssh_username": settings.ssh_username,
+                "ssh_password": settings.ssh_password.get_secret_value() if settings.ssh_password else None,
+                "ssh_key": settings.ssh_key,
+                "ssh_key_passphrase": settings.ssh_key_passphrase.get_secret_value() if settings.ssh_key_passphrase else None
+            }
         )
-    
-    # Update settings
-    for field, value in settings_update.dict(exclude_unset=True).items():
-        setattr(settings, field, value)
-    
-    await db.commit()
-    await db.refresh(settings)
-    return settings 
+        logger.info(f"Updated settings for user {current_user.id}")
+        return updated_settings
+    except Exception as e:
+        logger.error(f"Failed to update user settings: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to update settings: {str(e)}"
+        )
+
+
+@router.post("/settings/ssh/test", status_code=status.HTTP_200_OK)
+async def test_ssh_connection(
+    settings: SSHSettingsUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    """Test SSH connection with provided settings"""
+    try:
+        test_settings = UserSettings(
+            ssh_username=settings.ssh_username,
+            ssh_password=settings.ssh_password,
+            ssh_key=settings.ssh_key,
+            ssh_key_passphrase=settings.ssh_key_passphrase
+        )
+        transfer_service = FileTransferService(test_settings)
+        async with await transfer_service.get_ssh_connection() as conn:
+            # List files to test connection
+            result = await transfer_service.list_remote_files()
+            return {"message": "SSH connection successful", "files": result}
+    except Exception as e:
+        logger.error(f"SSH connection test failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"SSH connection test failed: {str(e)}"
+        ) 

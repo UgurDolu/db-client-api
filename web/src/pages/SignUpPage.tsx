@@ -11,13 +11,12 @@ import {
   CircularProgress,
   Divider,
 } from '@mui/material';
-import axios from 'axios';
 import { logger } from '../services/logger';
+import { authApi } from '../services/api';
 
 interface SignUpData {
   email: string;
   password: string;
-  full_name: string;
 }
 
 export default function SignUpPage() {
@@ -25,7 +24,6 @@ export default function SignUpPage() {
   const [formData, setFormData] = useState<SignUpData>({
     email: '',
     password: '',
-    full_name: '',
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -46,7 +44,7 @@ export default function SignUpPage() {
     setIsLoading(true);
 
     try {
-      await axios.post('http://localhost:8000/api/auth/register', formData);
+      await authApi.register(formData.email, formData.password);
       logger.info('Sign up successful, redirecting to login');
       navigate('/login', { 
         state: { 
@@ -104,23 +102,11 @@ export default function SignUpPage() {
               margin="normal"
               required
               fullWidth
-              id="full_name"
-              label="Full Name"
-              name="full_name"
-              autoComplete="name"
-              autoFocus
-              value={formData.full_name}
-              onChange={handleChange}
-              disabled={isLoading}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
               id="email"
               label="Email Address"
               name="email"
               autoComplete="email"
+              autoFocus
               value={formData.email}
               onChange={handleChange}
               disabled={isLoading}

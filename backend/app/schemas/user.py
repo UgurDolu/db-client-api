@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, SecretStr
 from typing import Optional
 
 class UserBase(BaseModel):
@@ -15,12 +15,18 @@ class UserSettings(BaseModel):
     export_type: Optional[str] = None
     max_parallel_queries: Optional[int] = None
     ssh_username: Optional[str] = None
-    ssh_password: Optional[str] = None
+    ssh_password: Optional[SecretStr] = None
     ssh_key: Optional[str] = None
-    ssh_key_passphrase: Optional[str] = None
+    ssh_key_passphrase: Optional[SecretStr] = None
 
     class Config:
         from_attributes = True
+
+class SSHSettingsUpdate(BaseModel):
+    ssh_username: Optional[str] = None
+    ssh_password: Optional[SecretStr] = None
+    ssh_key: Optional[str] = None
+    ssh_key_passphrase: Optional[SecretStr] = None
 
 class User(UserBase):
     id: int

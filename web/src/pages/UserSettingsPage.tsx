@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
-  Paper,
   Box,
   Button,
   TextField,
@@ -15,35 +14,40 @@ import {
   Card,
   CardContent,
   Grid,
-  Divider,
   Snackbar,
+  IconButton,
 } from '@mui/material';
-import { Save as SaveIcon } from '@mui/icons-material';
-import axios from 'axios';
+import { Save as SaveIcon, VpnKey as VpnKeyIcon } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { logger } from '../services/logger';
 import { SelectChangeEvent } from '@mui/material';
+import { userApi } from '../services/api';
 
 interface UserSettings {
   export_type: string;
   export_location: string;
-  notification_enabled: boolean;
-  default_db_username: string;
-  default_db_tns: string;
+  max_parallel_queries: number;
+  ssh_username: string;
+  ssh_password: string;
+  ssh_key: string;
+  ssh_key_passphrase: string;
 }
 
 const initialSettings: UserSettings = {
   export_type: 'csv',
   export_location: 'exports',
-  notification_enabled: true,
-  default_db_username: '',
-  default_db_tns: '',
+  max_parallel_queries: 3,
+  ssh_username: '',
+  ssh_password: '',
+  ssh_key: '',
+  ssh_key_passphrase: '',
 };
 
 export default function UserSettingsPage() {
   const [settings, setSettings] = useState<UserSettings>(initialSettings);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTestingSSH, setIsTestingSSH] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const { logout } = useAuth();
@@ -54,12 +58,8 @@ export default function UserSettingsPage() {
 
   const fetchSettings = async () => {
     try {
-      const response = await axios.get<UserSettings>('http://localhost:8000/api/users/me/settings', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      setSettings(response.data);
+      const data = await userApi.getSettings();
+      setSettings(data);
       logger.info('User settings fetched successfully');
     } catch (error) {
       logger.error('Failed to fetch user settings', error);
@@ -73,16 +73,7 @@ export default function UserSettingsPage() {
     setIsSaving(true);
     setError('');
     try {
-      await axios.put(
-        'http://localhost:8000/api/users/me/settings',
-        settings,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      await userApi.updateSettings(settings);
       logger.info('User settings updated successfully');
       setSuccessMessage('Settings saved successfully');
     } catch (error) {
@@ -90,6 +81,27 @@ export default function UserSettingsPage() {
       setError('Failed to save settings');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleTestSSH = async () => {
+    setIsTestingSSH(true);
+    setError('');
+    try {
+      const sshSettings = {
+        ssh_username: settings.ssh_username,
+        ssh_password: settings.ssh_password,
+        ssh_key: settings.ssh_key,
+        ssh_key_passphrase: settings.ssh_key_passphrase,
+      };
+      const response = await userApi.testSSHConnection(sshSettings);
+      setSuccessMessage('SSH connection test successful');
+      logger.info('SSH connection test successful', response);
+    } catch (error) {
+      logger.error('SSH connection test failed', error);
+      setError('SSH connection test failed');
+    } finally {
+      setIsTestingSSH(false);
     }
   };
 
@@ -105,10 +117,9 @@ export default function UserSettingsPage() {
   const handleSelectChange = (field: keyof UserSettings) => (
     event: SelectChangeEvent<string>
   ) => {
-    const value = event.target.value;
     setSettings(prev => ({
       ...prev,
-      [field]: field === 'notification_enabled' ? value === 'true' : value
+      [field]: event.target.value
     }));
   };
 
@@ -129,7 +140,7 @@ export default function UserSettingsPage() {
           User Settings
         </Typography>
         <Typography color="text.secondary">
-          Configure your preferences for query exports and notifications
+          Configure your preferences for exports and SSH connections
         </Typography>
       </Box>
 
@@ -158,6 +169,7 @@ export default function UserSettingsPage() {
                     <MenuItem value="csv">CSV</MenuItem>
                     <MenuItem value="excel">Excel</MenuItem>
                     <MenuItem value="json">JSON</MenuItem>
+                    <MenuItem value="feather">Feather</MenuItem>
                   </Select>
                 </FormControl>
 
@@ -168,69 +180,82 @@ export default function UserSettingsPage() {
                   onChange={handleTextChange('export_location')}
                   helperText="Default location for exported files"
                 />
+
+                <TextField
+                  fullWidth
+                  type="number"
+                  label="Max Parallel Queries"
+                  value={settings.max_parallel_queries}
+                  onChange={handleTextChange('max_parallel_queries')}
+                  helperText="Maximum number of queries that can run in parallel"
+                />
               </Box>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* Database Defaults */}
+        {/* SSH Settings */}
         <Grid item xs={12}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Database Defaults
+                SSH Settings
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <TextField
                   fullWidth
-                  label="Default Database Username"
-                  value={settings.default_db_username}
-                  onChange={handleTextChange('default_db_username')}
-                  helperText="Will be pre-filled when creating new queries"
+                  label="SSH Username"
+                  value={settings.ssh_username}
+                  onChange={handleTextChange('ssh_username')}
                 />
 
                 <TextField
                   fullWidth
-                  label="Default Database TNS"
-                  value={settings.default_db_tns}
-                  onChange={handleTextChange('default_db_tns')}
-                  helperText="Default TNS connection string"
+                  type="password"
+                  label="SSH Password"
+                  value={settings.ssh_password}
+                  onChange={handleTextChange('ssh_password')}
                 />
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
 
-        {/* Notification Settings */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Notification Settings
-              </Typography>
-              <FormControl fullWidth>
-                <InputLabel>Notifications</InputLabel>
-                <Select
-                  value={settings.notification_enabled ? 'true' : 'false'}
-                  onChange={handleSelectChange('notification_enabled')}
-                  label="Notifications"
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={4}
+                  label="SSH Key"
+                  value={settings.ssh_key}
+                  onChange={handleTextChange('ssh_key')}
+                  helperText="Paste your private SSH key here"
+                />
+
+                <TextField
+                  fullWidth
+                  type="password"
+                  label="SSH Key Passphrase"
+                  value={settings.ssh_key_passphrase}
+                  onChange={handleTextChange('ssh_key_passphrase')}
+                />
+
+                <Button
+                  variant="outlined"
+                  startIcon={<VpnKeyIcon />}
+                  onClick={handleTestSSH}
+                  disabled={isTestingSSH}
                 >
-                  <MenuItem value="true">Enabled</MenuItem>
-                  <MenuItem value="false">Disabled</MenuItem>
-                </Select>
-              </FormControl>
+                  {isTestingSSH ? 'Testing Connection...' : 'Test SSH Connection'}
+                </Button>
+              </Box>
             </CardContent>
           </Card>
         </Grid>
       </Grid>
 
-      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
         <Button
           variant="contained"
           color="primary"
+          startIcon={<SaveIcon />}
           onClick={handleSave}
           disabled={isSaving}
-          startIcon={isSaving ? <CircularProgress size={20} /> : <SaveIcon />}
         >
           {isSaving ? 'Saving...' : 'Save Settings'}
         </Button>

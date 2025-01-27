@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserData = async () => {
     try {
       logger.debug('Fetching user data');
-      const response = await axios.get('http://localhost:8000/api/users/me', {
+      const response = await axios.get('http://localhost:8000/api/users/settings', {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
         },
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         details: {
           code: (error as AxiosError)?.code,
           status: (error as AxiosError)?.response?.status,
-          url: 'http://localhost:8000/api/users/me'
+          url: 'http://localhost:8000/api/users/settings'
         }
       });
       logout();

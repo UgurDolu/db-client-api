@@ -39,9 +39,13 @@ class Settings(BaseSettings):
     SSH_PASSWORD: str = "testpass"
     SSH_KEY_FILE: Optional[str] = None  # Path to private key file for SSH authentication
     SSH_KEY_PASSPHRASE: Optional[str] = None  # Optional passphrase for SSH key
+    SSH_KEY: Optional[str] = None  # SSH key content as string
+    SSH_KNOWN_HOSTS: Optional[str] = None  # Path to known_hosts file
+    SSH_TIMEOUT: int = 30  # Connection timeout in seconds
+    SSH_KEEPALIVE_INTERVAL: int = 30  # Keepalive interval in seconds
 
     # Query Listener Settings
-    QUERY_LISTENER_CHECK_INTERVAL: int = 5  # seconds
+    QUERY_LISTENER_CHECK_INTERVAL: int = 60  # seconds
     QUERY_LISTENER_LOG_LEVEL: str = "INFO"
     
     @validator("ACCESS_TOKEN_EXPIRE_MINUTES", pre=True)
@@ -61,6 +65,7 @@ class Settings(BaseSettings):
     class Config:
         case_sensitive = True
         env_file = ".env"
+        extra = "allow"  # Allow extra fields in the settings
 
 
 settings = Settings() 

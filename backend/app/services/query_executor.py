@@ -11,6 +11,9 @@ from pathlib import Path
 import logging
 from app.services.file_transfer import file_transfer_service
 from app.core.config import settings
+from sqlalchemy.orm import selectinload
+from app.services.file_transfer import FileTransferService
+import asyncssh
 
 # Configure to use thin mode (no Oracle Client required)
 oracledb.defaults.thin = True
@@ -39,10 +42,17 @@ class QueryExecutor:
             logger.info(f"Getting user settings for query {self.query_id}")
             # Get user settings
             result = await self.db.execute(
-                select(UserSettings).where(UserSettings.user_id == self.user_id)
+                select(UserSettings)
+                .where(UserSettings.user_id == self.user_id)
+                .options(selectinload(UserSettings.user))  # Ensure we load the related user
             )
             self.user_settings = result.scalar_one_or_none()
-            logger.info(f"User settings retrieved for query {self.query_id}")
+            if self.user_settings:
+                logger.info(f"User settings retrieved for query {self.query_id}")
+                if self.user_settings.export_location:
+                    logger.info(f"User has custom export location: {self.user_settings.export_location}")
+            else:
+                logger.info(f"No user settings found for query {self.query_id}")
             
             logger.info(f"Connecting to Oracle for query {self.query_id} with DSN: {self.db_tns}")
             # Create connection using thin mode
@@ -99,55 +109,57 @@ class QueryExecutor:
             tmp_file_path = await self._save_results(df)
             logger.info(f"Saved query results to temporary file: {tmp_file_path}")
             
-            # Prepare metadata
-            file_size = os.path.getsize(tmp_file_path)
-            logger.info(f"File size: {file_size} bytes")
-            metadata = {
-                "rows": len(df),
-                "columns": len(df.columns),
-                "file_size": file_size,
-                "tmp_file_path": tmp_file_path
-            }
-            logger.info(f"Prepared metadata: {metadata}")
+            # Get fresh query with updated metadata
+            async with AsyncSession(self.db.bind) as session:
+                async with session.begin():
+                    result = await session.execute(
+                        select(Query).where(Query.id == self.query_id)
+                    )
+                    query = result.scalar_one()
+                    metadata = query.result_metadata
             
-            # Create final export directory if it doesn't exist
-            export_path = os.path.join("exports", str(self.user_id))
-            os.makedirs(export_path, exist_ok=True)
+            # Transfer file to final location
+            logger.info(f"Starting file transfer from {metadata['tmp_file_path']} to {metadata['final_file_path']}")
             
-            # Use the same filename but in the exports directory
-            filename = os.path.basename(tmp_file_path)
-            remote_file_path = os.path.join(export_path, filename)
-            logger.info(f"Using export path: {remote_file_path}")
-            
-            logger.info(f"Starting file transfer from {tmp_file_path} to {remote_file_path}")
-            transfer_success = await file_transfer_service.transfer_file(
-                tmp_file_path,
-                remote_file_path,
-                str(self.user_id)
-            )
-            
-            if transfer_success:
-                logger.info(f"File transfer successful for query {self.query_id}")
-                metadata["file_path"] = remote_file_path
-                await self._update_query_status(
-                    QueryStatus.COMPLETED,
-                    result_metadata=metadata
+            # Create FileTransferService with user settings
+            transfer_service = FileTransferService(self.user_settings)
+            try:
+                transfer_success = await transfer_service.transfer_file(
+                    metadata['tmp_file_path'],
+                    metadata['final_file_path'],
+                    str(self.user_id)
                 )
-                # Clean up temporary file
-                try:
-                    os.remove(tmp_file_path)
-                    logger.info(f"Cleaned up temporary file: {tmp_file_path}")
-                except Exception as e:
-                    logger.warning(f"Failed to clean up temporary file {tmp_file_path}: {str(e)}")
-                return True
-            else:
-                logger.error(f"File transfer failed for query {self.query_id}")
+                
+                if transfer_success:
+                    logger.info(f"File transfer successful for query {self.query_id}")
+                    await self._update_query_status(
+                        QueryStatus.COMPLETED,
+                        result_metadata=metadata
+                    )
+                    # Clean up temporary file
+                    try:
+                        os.remove(metadata['tmp_file_path'])
+                        logger.info(f"Cleaned up temporary file: {metadata['tmp_file_path']}")
+                    except Exception as e:
+                        logger.warning(f"Failed to clean up temporary file {metadata['tmp_file_path']}: {str(e)}")
+                    return True
+            except asyncssh.PermissionDenied as e:
+                error_msg = f"SSH permission denied: {str(e)}"
+                logger.error(f"{error_msg} for query {self.query_id}")
                 await self._update_query_status(
                     QueryStatus.FAILED,
-                    error_message="Failed to transfer results file"
+                    error_message=error_msg
                 )
                 return False
-
+            except Exception as e:
+                error_msg = f"File transfer failed: {str(e)}"
+                logger.error(f"{error_msg} for query {self.query_id}")
+                await self._update_query_status(
+                    QueryStatus.FAILED,
+                    error_message=error_msg
+                )
+                return False
+                
         except Exception as e:
             logger.error(f"Error executing query {self.query_id}: {str(e)}", exc_info=True)
             await self._update_query_status(
@@ -211,7 +223,7 @@ class QueryExecutor:
         """Save DataFrame to file based on export type"""
         try:
             # Create temp directory for exports
-            temp_dir = os.path.join("tmp", "exports", str(self.user_id))
+            temp_dir = os.path.join("tmp", "exports")
             os.makedirs(temp_dir, exist_ok=True)
             
             # Generate filename with timestamp
@@ -221,7 +233,7 @@ class QueryExecutor:
                 extension = 'xlsx'
             else:
                 extension = self.export_type
-            filename = f"query_{self.query_id}_{timestamp}.{extension}"
+            filename = f"query_{timestamp}.{extension}"
             filepath = os.path.join(temp_dir, filename)
             
             # Save based on export type
@@ -241,17 +253,55 @@ class QueryExecutor:
             # Get file size in bytes
             file_size = os.path.getsize(filepath)
             
+            # Determine export location from user settings
+            export_location = None
+            if self.user_settings and self.user_settings.export_location:
+                export_location = self.user_settings.export_location
+                logger.info(f"Using export location from user settings: {export_location}")
+            else:
+                # Get fresh query object to check export location
+                async with AsyncSession(self.db.bind) as session:
+                    async with session.begin():
+                        result = await session.execute(
+                            select(Query).where(Query.id == self.query_id)
+                        )
+                        query = result.scalar_one()
+                        export_location = query.export_location
+                        if export_location:
+                            logger.info(f"Using export location from query: {export_location}")
+
+            # If no export location specified, use default shared directory
+            if not export_location:
+                export_location = "shared"
+                logger.info("No export location specified, using default shared directory")
+            
+            # Create final export path - simplified structure
+            final_path = os.path.join(export_location, filename)
+            logger.info(f"Final export path: {final_path}")
+            
             # Update query with result metadata
-            self.query.result_metadata = {
-                'file_path': filepath,
-                'file_size': file_size,  # in bytes
+            metadata = {
+                'tmp_file_path': filepath,
+                'final_file_path': final_path,
+                'file_size': file_size,
                 'rows': len(df),
                 'columns': len(df.columns),
                 'column_names': list(df.columns)
             }
             
-            logger.info(f"Saved query results to {filepath}")
-            logger.info(f"Result metadata: {self.query.result_metadata}")
+            # Update query metadata in database
+            async with AsyncSession(self.db.bind) as session:
+                async with session.begin():
+                    result = await session.execute(
+                        select(Query).where(Query.id == self.query_id)
+                    )
+                    query = result.scalar_one()
+                    query.result_metadata = metadata
+                    await session.commit()
+            
+            logger.info(f"Saved query results to temporary file: {filepath}")
+            logger.info(f"Final export path will be: {final_path}")
+            logger.info(f"Result metadata: {metadata}")
             
             return filepath
         except Exception as e:
