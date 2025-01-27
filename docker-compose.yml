@@ -71,6 +71,27 @@ services:
       timeout: 10s
       retries: 5
 
+  sshtest:
+    build:
+      context: ./docker/sshtest
+      dockerfile: Dockerfile
+    container_name: db_client_sshtest
+    environment:
+      - SSH_USER=testuser
+      - SSH_PASSWORD=testpass
+    ports:
+      - "2222:22"
+    volumes:
+      - ./exports:/home/testuser/shared
+    networks:
+      - db_client_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/usr/sbin/sshd", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 networks:
   db_client_network:
     driver: bridge

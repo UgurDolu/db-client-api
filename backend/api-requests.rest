@@ -20,16 +20,16 @@ username=ugur@gmail.com&password=deneme
 
 ### Get all users
 GET http://localhost:8000/api/users/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODA1MzkzN30.dm7QGa5PC41buBADGHxiFWmQ_6xtWtrDWrUhZHcZTZs
 
 ### Get specific user
 GET http://localhost:8000/api/users/me/settings
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODA1MzkzN30.dm7QGa5PC41buBADGHxiFWmQ_6xtWtrDWrUhZHcZTZs
 
 ### Update user
 PUT http://localhost:8000/api/users/me/settings
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODA1MzkzN30.dm7QGa5PC41buBADGHxiFWmQ_6xtWtrDWrUhZHcZTZs
 
 {
     "export_location": "./exports",
@@ -41,29 +41,29 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtY
 
 ### List queries
 GET http://localhost:8000/api/queries/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODA1MzkzN30.dm7QGa5PC41buBADGHxiFWmQ_6xtWtrDWrUhZHcZTZs
 
 ### Post New Query
 POST http://localhost:8000/api/queries/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODA1MzkzN30.dm7QGa5PC41buBADGHxiFWmQ_6xtWtrDWrUhZHcZTZs
 Content-Type: application/json
 
 {   
     "db_username": "t088503",
     "db_password": "hilaL250202",
     "db_tns": "localhost:1521/XE",
-    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 1000",
-    "export_type": "excel"
+    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 950000",
+    "export_type": "feather"
 }
 
 ### Get Query Stats
 GET http://localhost:8000/api/queries/2
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODA1MzkzN30.dm7QGa5PC41buBADGHxiFWmQ_6xtWtrDWrUhZHcZTZs
 
 ### Get Current Stats
 GET http://localhost:8000/api/queries/stats/current
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODA1MzkzN30.dm7QGa5PC41buBADGHxiFWmQ_6xtWtrDWrUhZHcZTZs
 
 ### Delete Query
 DELETE http://localhost:8000/api/queries/88
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczNzgyMDQyOX0.xYDr-cpyLO3MGUYLKE3YrmLsArHcExAjY9YWwCZ1qR4
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODA1MzkzN30.dm7QGa5PC41buBADGHxiFWmQ_6xtWtrDWrUhZHcZTZs

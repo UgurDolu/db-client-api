@@ -38,7 +38,7 @@ CREATE OR REPLACE PROCEDURE example.generate_test_data AS
     v_statuses VARCHAR2(100) := 'Active,Inactive,On Leave,Terminated';
 BEGIN
     -- Generate 1,000,000 records
-    FOR i IN 1..1000000 LOOP
+    FOR i IN 1..10000000 LOOP
         -- Generate random name
         v_name := DBMS_RANDOM.STRING('U', 1) || DBMS_RANDOM.STRING('L', 5) || ' ' ||
                   DBMS_RANDOM.STRING('U', 1) || DBMS_RANDOM.STRING('L', 7);
