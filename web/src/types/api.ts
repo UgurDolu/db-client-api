@@ -9,6 +9,8 @@ export interface UserSettings {
     export_type: string;
     export_location: string;
     max_parallel_queries: number;
+    ssh_hostname: string;
+    ssh_port: number;
     ssh_username: string;
     ssh_password: string;
     ssh_key: string;
@@ -16,6 +18,8 @@ export interface UserSettings {
 }
 
 export interface SSHSettings {
+    ssh_hostname: string;
+    ssh_port: number;
     ssh_username: string;
     ssh_password: string;
     ssh_key: string;

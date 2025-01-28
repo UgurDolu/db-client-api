@@ -59,6 +59,13 @@ async def update_user_settings_endpoint(
                     detail=f"Invalid export type. Valid types are: {app_settings.VALID_EXPORT_TYPES}"
                 )
 
+        # Validate SSH port if provided
+        if settings.ssh_port is not None and (settings.ssh_port < 1 or settings.ssh_port > 65535):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="SSH port must be between 1 and 65535"
+            )
+
         # Update settings in database
         updated_settings = await update_user_settings(
             db,
@@ -67,6 +74,8 @@ async def update_user_settings_endpoint(
                 "export_type": settings.export_type,
                 "export_location": settings.export_location,
                 "max_parallel_queries": settings.max_parallel_queries,
+                "ssh_hostname": settings.ssh_hostname,
+                "ssh_port": settings.ssh_port,
                 "ssh_username": settings.ssh_username,
                 "ssh_password": settings.ssh_password.get_secret_value() if settings.ssh_password else None,
                 "ssh_key": settings.ssh_key,

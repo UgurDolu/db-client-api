@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from app.core.config import settings
 
 engine = create_async_engine(
-    settings.get_database_uri(),
+    settings.SQLALCHEMY_DATABASE_URI,
     pool_pre_ping=True,
     echo=True,
 )
@@ -20,4 +20,7 @@ async def get_db():
         try:
             yield session
         finally:
-            await session.close() 
+            await session.close()
+
+async def dispose_engine():
+    await engine.dispose() 

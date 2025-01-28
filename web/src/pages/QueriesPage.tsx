@@ -72,6 +72,7 @@ interface Query {
   result_metadata: any;
   export_type?: string;
   export_location?: string;
+  ssh_hostname?: string;  // Optional SSH hostname for remote execution
 }
 
 interface NewQuery {
@@ -79,6 +80,9 @@ interface NewQuery {
   db_password: string;
   db_tns: string;
   query_text: string;
+  ssh_hostname?: string;  // Optional SSH hostname for remote execution
+  export_type?: string;
+  export_location?: string;
 }
 
 interface QueryDetails {
@@ -119,6 +123,9 @@ const initialNewQuery: NewQuery = {
   db_password: '',
   db_tns: '',
   query_text: '',
+  ssh_hostname: '',  // Initialize empty
+  export_type: '',
+  export_location: ''
 };
 
 const getStatusIcon = (status: string) => {
@@ -1052,70 +1059,106 @@ export default function QueriesPage() {
       >
         <DialogTitle>Create New Query</DialogTitle>
         <DialogContent>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
-              {error}
-            </Alert>
-          )}
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            label="Database Username"
-            name="db_username"
-            value={newQuery.db_username}
-            onChange={handleInputChange}
-            disabled={isSubmitting}
-          />
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            label="Database Password"
-            name="db_password"
-            type="password"
-            value={newQuery.db_password}
-            onChange={handleInputChange}
-            disabled={isSubmitting}
-          />
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            label="Database TNS"
-            name="db_tns"
-            value={newQuery.db_tns}
-            onChange={handleInputChange}
-            disabled={isSubmitting}
-            placeholder="localhost:1521/XE"
-          />
-          <TextField
-            margin="normal"
-            required
-            fullWidth
-            label="SQL Query"
-            name="query_text"
-            value={newQuery.query_text}
-            onChange={handleInputChange}
-            disabled={isSubmitting}
-            multiline
-            rows={4}
-            placeholder="SELECT * FROM table WHERE condition"
-          />
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+            {error && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {error}
+              </Alert>
+            )}
+            
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Database Username"
+                  name="db_username"
+                  value={newQuery.db_username}
+                  onChange={handleInputChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Database Password"
+                  name="db_password"
+                  type="password"
+                  value={newQuery.db_password}
+                  onChange={handleInputChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="TNS Connection String"
+                  name="db_tns"
+                  value={newQuery.db_tns}
+                  onChange={handleInputChange}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="SSH Hostname (Optional)"
+                  name="ssh_hostname"
+                  value={newQuery.ssh_hostname}
+                  onChange={handleInputChange}
+                  helperText="Remote server hostname for SSH tunnel connection"
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Query Text"
+                  name="query_text"
+                  value={newQuery.query_text}
+                  onChange={handleInputChange}
+                  required
+                  multiline
+                  rows={4}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Export Type</InputLabel>
+                  <Select
+                    name="export_type"
+                    value={newQuery.export_type}
+                    onChange={(e) => handleInputChange(e as any)}
+                    label="Export Type"
+                  >
+                    <MenuItem value="">None</MenuItem>
+                    <MenuItem value="csv">CSV</MenuItem>
+                    <MenuItem value="excel">Excel</MenuItem>
+                    <MenuItem value="json">JSON</MenuItem>
+                    <MenuItem value="feather">Feather</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Export Location"
+                  name="export_location"
+                  value={newQuery.export_location}
+                  onChange={handleInputChange}
+                  helperText="Optional path for exported files"
+                />
+              </Grid>
+            </Grid>
+          </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button 
-            onClick={() => setIsCreateModalOpen(false)} 
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
+        <DialogActions>
+          <Button onClick={() => setIsCreateModalOpen(false)}>Cancel</Button>
           <Button
             onClick={handleCreateQuery}
             variant="contained"
-            disabled={isSubmitting || !newQuery.db_username || !newQuery.db_password || !newQuery.db_tns || !newQuery.query_text}
+            disabled={isSubmitting}
+            startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
           >
-            {isSubmitting ? <CircularProgress size={24} /> : 'Create'}
+            {isSubmitting ? 'Creating...' : 'Create Query'}
           </Button>
         </DialogActions>
       </Dialog>

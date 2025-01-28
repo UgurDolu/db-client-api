@@ -152,57 +152,79 @@ class QueryExecutor:
                 )
                 user_settings = result.scalar_one_or_none()
 
-            # Connect to Oracle
-            oracle_conn = oracledb.connect(
-                user=query.db_username,
-                password=query.db_password,
-                dsn=query.db_tns
-            )
-
-            # Update status to running
-            await self._update_query_status(query.id, QueryStatus.running.value)
-
-            # Execute query and process results
-            cursor = oracle_conn.cursor()
-            try:
-                cursor.execute(query.query_text)
-                columns = [col[0] for col in cursor.description]
-                rows = cursor.fetchall()
-                df = pd.DataFrame(rows, columns=columns)
-
-                # Save and transfer results
-                tmp_file_path, result_metadata = await self._save_results(df, query, user_settings)
-                
-                # Calculate final file path based on user settings or query-specific path
-                final_path = query.export_location or user_settings.export_location
-                final_filename = f"query_{query.id}_result.{query.export_type or 'csv'}"
-                final_file_path = os.path.join(final_path, final_filename)
-                result_metadata["final_file_path"] = final_file_path.replace("\\", "/")  # Normalize path separators
-                
-                # Update status to transferring
-                await self._update_query_status(
-                    query.id,
-                    QueryStatus.transferring.value,
-                    result_metadata=result_metadata
-                )
-
-                # Transfer file
-                transfer_service = FileTransferService(user_settings)
-                success = await transfer_service.transfer_file(
-                    str(tmp_file_path),
-                    final_filename,
-                    str(query.user_id)
-                )
-
-                if success:
-                    await self._update_query_status(query.id, QueryStatus.completed.value)
-                    return True
+                # Log transfer details
+                logger.info(f"Query {query.id} transfer details:")
+                if query.ssh_hostname:
+                    logger.info(f"File will be transferred to host: {query.ssh_hostname}")
+                elif user_settings and user_settings.ssh_hostname:
+                    logger.info(f"File will be transferred to host: {user_settings.ssh_hostname} (from user settings)")
                 else:
-                    raise Exception("File transfer failed")
+                    logger.info("Using local file transfer (no SSH hostname specified)")
+                
+                if query.export_location:
+                    logger.info(f"Export location is: {query.export_location}")
+                elif user_settings and user_settings.export_location:
+                    logger.info(f"Export location is: {user_settings.export_location} (from user settings)")
+                else:
+                    logger.info(f"Using default export location: {settings.DEFAULT_EXPORT_LOCATION}")
 
-            finally:
-                if cursor:
-                    cursor.close()
+                # Connect to Oracle
+                oracle_conn = oracledb.connect(
+                    user=query.db_username,
+                    password=query.db_password,
+                    dsn=query.db_tns
+                )
+
+                # Update status to running
+                await self._update_query_status(query.id, QueryStatus.running.value)
+
+                # Execute query and process results
+                cursor = oracle_conn.cursor()
+                try:
+                    cursor.execute(query.query_text)
+                    columns = [col[0] for col in cursor.description]
+                    rows = cursor.fetchall()
+                    df = pd.DataFrame(rows, columns=columns)
+
+                    # Save and transfer results
+                    tmp_file_path, result_metadata = await self._save_results(df, query, user_settings)
+                    
+                    # Calculate final file path based on user settings or query-specific path
+                    final_path = (
+                        query.export_location or 
+                        (user_settings.export_location if user_settings else None) or 
+                        settings.DEFAULT_EXPORT_LOCATION
+                    )
+                    final_filename = f"query_{query.id}_result.{query.export_type or 'csv'}"
+                    final_file_path = os.path.join(final_path, final_filename)
+                    result_metadata["final_file_path"] = final_file_path.replace("\\", "/")  # Normalize path separators
+                    
+                    # Update status to transferring
+                    await self._update_query_status(
+                        query.id,
+                        QueryStatus.transferring.value,
+                        result_metadata=result_metadata
+                    )
+
+                    # Create transfer service with user settings
+                    transfer_service = FileTransferService(user_settings)
+                    
+                    success = await transfer_service.transfer_file(
+                        str(tmp_file_path),
+                        final_filename,
+                        str(query.user_id),
+                        query  # Pass the query object
+                    )
+
+                    if success:
+                        await self._update_query_status(query.id, QueryStatus.completed.value)
+                        return True
+                    else:
+                        raise Exception("File transfer failed")
+
+                finally:
+                    if cursor:
+                        cursor.close()
                 
         except Exception as e:
             logger.error(f"Error executing query {query.id}: {str(e)}", exc_info=True)
@@ -233,38 +255,38 @@ class QueryExecutor:
         while retry_count < max_retries:
             try:
                 async with AsyncSessionLocal() as session:
-                async with session.begin():
-                    result = await session.execute(
-                            select(Query).where(Query.id == query_id)
-                    )
-                    query = result.scalar_one()
-                    
-                    query.status = status
-                    if error_message:
-                        query.error_message = error_message
-                    if result_metadata:
-                            existing_metadata = query.result_metadata or {}
-                            existing_metadata.update(result_metadata)
-                            query.result_metadata = existing_metadata
-                    
+                    async with session.begin():
+                        result = await session.execute(
+                                select(Query).where(Query.id == query_id)
+                        )
+                        query = result.scalar_one()
+                        
+                        query.status = status
+                        if error_message:
+                            query.error_message = error_message
+                        if result_metadata:
+                                existing_metadata = query.result_metadata or {}
+                                existing_metadata.update(result_metadata)
+                                query.result_metadata = existing_metadata
+                        
                         if status == QueryStatus.running.value:
-                        query.started_at = datetime.utcnow()
+                            query.started_at = datetime.utcnow()
                         elif status in [QueryStatus.completed.value, QueryStatus.failed.value]:
-                        query.completed_at = datetime.utcnow()
-                    
-                    await session.commit()
+                            query.completed_at = datetime.utcnow()
+                        
+                        await session.commit()
                         logger.info(f"Status updated successfully for query {query_id} to {status}")
                         return True
-                    
-        except Exception as e:
-                retry_count += 1
-                logger.error(f"Error updating query status (attempt {retry_count}): {str(e)}")
-                if retry_count < max_retries:
-                    await asyncio.sleep(1)  # Wait before retrying
-                else:
-                    logger.error(f"Failed to update status after {max_retries} attempts")
-                    return False
-        
+                        
+            except Exception as e:
+                    retry_count += 1
+                    logger.error(f"Error updating query status (attempt {retry_count}): {str(e)}")
+                    if retry_count < max_retries:
+                        await asyncio.sleep(1)  # Wait before retrying
+                    else:
+                        logger.error(f"Failed to update status after {max_retries} attempts")
+                        return False
+            
         return False
 
     async def _save_results(self, df: pd.DataFrame, query: Query, user_settings: Optional[UserSettings]) -> tuple[Path, dict]:

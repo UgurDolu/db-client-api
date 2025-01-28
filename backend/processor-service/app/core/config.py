@@ -4,6 +4,7 @@ import secrets
 from pydantic import validator
 import os
 import sys
+from shared.config import db_settings
 
 
 class Settings(BaseSettings):
@@ -16,11 +17,11 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200  # 30 days
     
     # Database
-    POSTGRES_SERVER: str = "localhost"
-    POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "postgres"
-    POSTGRES_DB: str = "db_client"
-    _SQLALCHEMY_DATABASE_URI: Optional[str] = None
+    POSTGRES_SERVER: str = db_settings.POSTGRES_SERVER
+    POSTGRES_USER: str = db_settings.POSTGRES_USER
+    POSTGRES_PASSWORD: str = db_settings.POSTGRES_PASSWORD
+    POSTGRES_DB: str = db_settings.POSTGRES_DB
+    SQLALCHEMY_DATABASE_URI: str = db_settings.get_database_uri()
 
     # Queue Settings
     DEFAULT_MAX_PARALLEL_QUERIES: int = 3
@@ -58,8 +59,8 @@ class Settings(BaseSettings):
         return value
 
     def get_database_uri(self) -> str:
-        if self._SQLALCHEMY_DATABASE_URI:
-            return self._SQLALCHEMY_DATABASE_URI
+        if self.SQLALCHEMY_DATABASE_URI:
+            return self.SQLALCHEMY_DATABASE_URI
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
 
     class Config:

@@ -1,11 +1,12 @@
 import asyncio
 import os
 import logging
+import shutil
 from pathlib import Path
 import asyncssh
 from app.core.config import settings
 from typing import Optional
-from app.db.models import UserSettings  # Import from models instead of schemas
+from app.db.models import UserSettings, Query, QueryStatus  # Import QueryStatus
 
 # Configure logger with console handler
 logger = logging.getLogger(__name__)
@@ -50,16 +51,32 @@ class FileTransferService:
             logger.error(f"Error creating directory {path}: {str(e)}")
             raise
 
-    async def get_ssh_connection(self):
-        """Create an SSH connection using user settings or defaults"""
+    async def get_ssh_connection(self, query: Optional[Query] = None):
+        """Create an SSH connection using query settings, user settings, or defaults
+        
+        Args:
+            query: Optional Query object that may contain SSH hostname override
+        """
         try:
-            # First check if user has their own SSH credentials
+            # First check if query has SSH hostname specified
+            if query and query.ssh_hostname:
+                host = query.ssh_hostname
+                logger.info(f"Using SSH hostname from query: {host}")
+            # Then check if user has their own SSH settings
+            elif self.settings and self.settings.ssh_hostname:
+                host = self.settings.ssh_hostname
+                logger.info(f"Using SSH hostname from user settings: {host}")
+            else:
+                # Fall back to environment settings
+                host = settings.SSH_HOST
+                logger.info(f"Using default SSH hostname: {host}")
+
+            # Get remaining connection details from user settings or environment
             if (self.settings and 
                 self.settings.ssh_username and 
                 (self.settings.ssh_password or self.settings.ssh_key)):
                 # Use user's credentials
-                host = settings.SSH_HOST
-                port = settings.SSH_PORT
+                port = self.settings.ssh_port or settings.SSH_PORT
                 username = self.settings.ssh_username
                 password = self.settings.ssh_password if self.settings.ssh_password else None
                 ssh_key = self.settings.ssh_key
@@ -67,7 +84,6 @@ class FileTransferService:
                 logger.info("Using user's SSH credentials")
             else:
                 # Fall back to environment settings
-                host = settings.SSH_HOST
                 port = settings.SSH_PORT
                 username = settings.SSH_USERNAME
                 password = settings.SSH_PASSWORD
@@ -142,151 +158,154 @@ class FileTransferService:
             logger.error(f"SSH connection failed: {str(e)}", exc_info=True)
             raise
 
-    async def upload_file(self, local_path: str, remote_path: str):
+    async def upload_file(self, local_path: str, remote_path: str, query: Optional[Query] = None):
         """Upload a file to the remote server"""
         try:
-            async with await self.get_ssh_connection() as conn:
+            async with await self.get_ssh_connection(query) as conn:
                 await asyncssh.scp(local_path, (conn, remote_path))
                 logger.info(f"Successfully uploaded {local_path} to {remote_path}")
                 return True
         except Exception as e:
             logger.error(f"File upload failed: {str(e)}")
+            if query:
+                query.status = QueryStatus.failed.value
+                query.error_message = f"File upload failed: {str(e)}"
             raise
 
-    async def download_file(self, remote_path: str, local_path: str):
+    async def download_file(self, remote_path: str, local_path: str, query: Optional[Query] = None):
         """Download a file from the remote server"""
         try:
-            async with await self.get_ssh_connection() as conn:
+            async with await self.get_ssh_connection(query) as conn:
                 await asyncssh.scp((conn, remote_path), local_path)
                 logger.info(f"Successfully downloaded {remote_path} to {local_path}")
                 return True
         except Exception as e:
             logger.error(f"File download failed: {str(e)}")
+            if query:
+                query.status = QueryStatus.failed.value
+                query.error_message = f"File download failed: {str(e)}"
             raise
 
-    async def list_remote_files(self, remote_path: str = "~/shared"):
+    async def list_remote_files(self, remote_path: str = "~/shared", query: Optional[Query] = None):
         """List files in the remote directory"""
         try:
-            async with await self.get_ssh_connection() as conn:
+            async with await self.get_ssh_connection(query) as conn:
                 result = await conn.run(f'ls -la {remote_path}')
                 return result.stdout
         except Exception as e:
             logger.error(f"Failed to list remote files: {str(e)}")
+            if query:
+                query.status = QueryStatus.failed.value
+                query.error_message = f"Failed to list remote files: {str(e)}"
             raise
 
-    async def transfer_file(self, local_path: str, remote_path: str, user_id: str) -> bool:
-        """Transfer a file from temporary storage to user's export location via SCP with retries."""
-        retries = 0
-        while retries < self.max_retries:
-            try:
-                # Ensure local directory exists and file is readable
-                local_path = os.path.abspath(local_path)
-                if not os.path.exists(local_path):
-                    raise FileNotFoundError(f"Local file not found: {local_path}")
-                
-                # Convert paths to use forward slashes and normalize
-                local_path = local_path.replace('\\', '/')
-                remote_path = remote_path.replace('\\', '/')
-                
-                # Get remote directory path from user settings or fall back to default
-                logger.info(f"Current settings type: {type(self.settings)}")
-                logger.info(f"Settings content: {self.settings}")
-                
-                if self.settings and self.settings.export_location:
-                    remote_dir = self.settings.export_location.strip().replace('\\', '/').rstrip('/')
-                    logger.info(f"Using export location from user settings: {remote_dir}")
-                else:
-                    logger.info("Falling back to default export location because:")
-                    if not self.settings:
-                        logger.info("- settings is None")
-                    elif not self.settings.export_location:
-                        logger.info("- export_location is empty or None")
-                    remote_dir = settings.DEFAULT_EXPORT_LOCATION.strip().replace('\\', '/').rstrip('/')
-                    logger.info(f"Using default export location: {remote_dir}")
-                
-                # Clean up the filename and ensure it uses forward slashes
-                filename = os.path.basename(remote_path).replace('\\', '/')
-                
-                # Construct the final remote path using clean components
-                remote_path = f"{remote_dir}/{filename}"
-                logger.info(f"Final remote path: {remote_path}")
-                
-                # Try SSH transfer
+    async def cleanup_tmp_directory(self):
+        """Clean up the temporary exports directory."""
+        try:
+            if self.tmp_dir.exists():
+                shutil.rmtree(str(self.tmp_dir))
+                logger.info(f"Successfully cleaned up temporary directory: {self.tmp_dir}")
+                # Recreate empty directory
+                self.ensure_directory(self.tmp_dir)
+        except Exception as e:
+            logger.error(f"Error cleaning up temporary directory {self.tmp_dir}: {str(e)}", exc_info=True)
+            raise
+
+    async def transfer_file(self, local_path: str, remote_path: str, user_id: str, query: Query) -> bool:
+        """Transfer a file from temporary storage to user's export location via SCP with retries.
+        
+        Args:
+            local_path: Path to the local file to transfer
+            remote_path: Destination path on the remote server
+            user_id: ID of the user performing the transfer
+            query: Query object containing status and error information
+        """
+        try:
+            # Ensure local directory exists and file is readable
+            local_path = os.path.abspath(local_path)
+            if not os.path.exists(local_path):
+                error_msg = f"Local file not found: {local_path}"
+                query.status = QueryStatus.failed.value
+                query.error_message = error_msg
+                raise FileNotFoundError(error_msg)
+            
+            # Convert paths to use forward slashes and normalize
+            local_path = local_path.replace('\\', '/')
+            remote_path = remote_path.replace('\\', '/')
+            
+            # Get remote directory path with proper priority:
+            # 1. Query's export_location
+            # 2. User settings' export_location
+            # 3. Default export location
+            if query.export_location:
+                remote_dir = query.export_location.strip().replace('\\', '/').rstrip('/')
+                logger.info(f"Using export location from query: {remote_dir}")
+            elif self.settings and self.settings.export_location:
+                remote_dir = self.settings.export_location.strip().replace('\\', '/').rstrip('/')
+                logger.info(f"Using export location from user settings: {remote_dir}")
+            else:
+                remote_dir = settings.DEFAULT_EXPORT_LOCATION.strip().replace('\\', '/').rstrip('/')
+                logger.info(f"Using default export location: {remote_dir}")
+            
+            # Clean up the filename and ensure it uses forward slashes
+            filename = os.path.basename(remote_path).replace('\\', '/')
+            remote_path = f"{remote_dir}/{filename}"
+            logger.info(f"Final remote path: {remote_path}")
+            
+            retries = 0
+            last_error = None
+            
+            while retries < self.max_retries:
                 try:
-                    async with await self.get_ssh_connection() as ssh:
+                    async with await self.get_ssh_connection(query) as ssh:
                         # First, ensure remote directory exists
                         mkdir_cmd = f'mkdir -p "{remote_dir}"'
-                        logger.info(f"Creating remote directory with command: {mkdir_cmd}")
                         result = await ssh.run(mkdir_cmd)
                         if result.exit_status != 0:
-                            logger.error(f"Failed to create remote directory: {result.stderr}")
                             raise Exception(f"Failed to create remote directory: {result.stderr}")
-                        
-                        # List the directory contents before transfer
-                        logger.info(f"Listing remote directory contents before transfer")
-                        result = await ssh.run(f'ls -la "{remote_dir}"')
-                        logger.info(f"Remote directory contents before transfer:\n{result.stdout}")
                         
                         # Transfer the file using SCP
                         logger.info(f"Starting SCP transfer: {local_path} -> {remote_path}")
-                        try:
-                            await asyncssh.scp(local_path, (ssh, remote_path))
-                            logger.info("SCP transfer completed")
-                        except Exception as scp_error:
-                            logger.error(f"SCP transfer failed: {str(scp_error)}")
-                            raise
+                        await asyncssh.scp(local_path, (ssh, remote_path))
                         
-                        # Verify the file exists and has correct permissions
+                        # Verify the file exists and set permissions
                         verify_cmd = f'ls -l "{remote_path}"'
-                        logger.info(f"Verifying file with command: {verify_cmd}")
                         result = await ssh.run(verify_cmd)
                         if result.exit_status == 0:
-                            logger.info(f"File transfer verified. File details: {result.stdout}")
-                            # Set appropriate permissions
-                            chmod_cmd = f'chmod 644 "{remote_path}"'
-                            logger.info(f"Setting file permissions with command: {chmod_cmd}")
-                            await ssh.run(chmod_cmd)
+                            await ssh.run(f'chmod 644 "{remote_path}"')
                             return True
                         else:
-                            logger.error(f"File transfer verification failed: {result.stderr}")
                             raise Exception(f"File transfer verification failed: {result.stderr}")
                             
                 except Exception as ssh_error:
-                    logger.error(f"SSH transfer failed: {str(ssh_error)}", exc_info=True)
+                    last_error = str(ssh_error)
+                    logger.error(f"SSH transfer attempt {retries + 1} failed: {last_error}")
                     if retries + 1 < self.max_retries:
-                        logger.warning(f"Retrying transfer... ({retries + 1}/{self.max_retries})")
                         retries += 1
                         await asyncio.sleep(self.retry_delay)
                         continue
                     else:
-                        # Don't fall back to local copy for permission errors
-                        if "Permission denied" in str(ssh_error):
-                            logger.error("Permission denied error - not falling back to local copy")
-                            raise ssh_error
-                        
-                        # Fall back to local copy for development
-                        logger.warning("All SSH transfer attempts failed, falling back to local copy")
-                        import shutil
-                        remote_dir = os.path.dirname(remote_path)
-                        try:
-                            os.makedirs(remote_dir, exist_ok=True)
-                            shutil.copy2(local_path, remote_path)
-                            logger.info(f"Successfully copied file locally")
-                            return True
-                        except Exception as copy_error:
-                            logger.error(f"Local copy failed: {str(copy_error)}")
-                            raise Exception(f"Transfer failed and local copy failed: {str(copy_error)}")
-                
-            except Exception as e:
-                logger.error(f"Transfer attempt {retries + 1} failed: {str(e)}", exc_info=True)
-                if retries + 1 < self.max_retries:
-                    retries += 1
-                    await asyncio.sleep(self.retry_delay)
-                else:
-                    logger.error("All transfer attempts failed")
-                    raise Exception(f"All transfer attempts failed: {str(e)}")
-        
-        return False
+                        # Update query status and error message
+                        query.status = QueryStatus.failed.value
+                        query.error_message = f"SSH transfer failed after {self.max_retries} attempts: {last_error}"
+                        raise Exception(query.error_message)
+            
+            return False
+            
+        except Exception as e:
+            # Ensure query status is updated on any error
+            query.status = QueryStatus.failed.value
+            query.error_message = str(e)
+            raise
+        finally:
+            # Always clean up temporary files
+            try:
+                if os.path.exists(local_path):
+                    os.remove(local_path)
+                    logger.info(f"Cleaned up temporary file: {local_path}")
+                await self.cleanup_tmp_directory()
+            except Exception as cleanup_error:
+                logger.error(f"Error during cleanup: {str(cleanup_error)}")
 
     def cleanup_tmp_file(self, file_path: str) -> bool:
         """Remove temporary file after successful transfer."""

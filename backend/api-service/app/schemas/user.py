@@ -14,6 +14,8 @@ class UserSettings(BaseModel):
     export_location: Optional[str] = None
     export_type: Optional[str] = None
     max_parallel_queries: Optional[int] = None
+    ssh_hostname: Optional[str] = None
+    ssh_port: Optional[int] = 22
     ssh_username: Optional[str] = None
     ssh_password: Optional[SecretStr] = None
     ssh_key: Optional[str] = None
@@ -23,6 +25,8 @@ class UserSettings(BaseModel):
         from_attributes = True
 
 class SSHSettingsUpdate(BaseModel):
+    ssh_hostname: Optional[str] = None
+    ssh_port: Optional[int] = 22
     ssh_username: Optional[str] = None
     ssh_password: Optional[SecretStr] = None
     ssh_key: Optional[str] = None

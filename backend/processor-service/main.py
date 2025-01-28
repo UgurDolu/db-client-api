@@ -1,31 +1,21 @@
+import os
+import sys
 import asyncio
 import logging
-from app.core.config import settings
-from app.services.query_executor import QueryExecutor
-from app.db.session import dispose_engine
 from contextlib import asynccontextmanager
+
+# Add the backend directory to the Python path
+backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-@asynccontextmanager
-async def lifespan():
-    # Startup
-    logger.info("Starting up processor service...")
-    executor = QueryExecutor()
-    task = asyncio.create_task(executor.process_queries())
-    yield
-    # Shutdown
-    logger.info("Shutting down processor service...")
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
-    # Cleanup database connections
-    await dispose_engine()
-    logger.info("Processor service shutdown complete")
+from app.core.config import settings
+from app.services.query_executor import QueryExecutor
+from app.db.session import dispose_engine
 
 def main():
     executor = QueryExecutor()

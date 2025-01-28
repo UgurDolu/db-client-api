@@ -18,6 +18,7 @@ class QueryBase(BaseModel):
     query_text: str
     export_location: Optional[str] = None
     export_type: Optional[str] = None
+    ssh_hostname: Optional[str] = None  # Optional SSH hostname for remote execution
 
 class QueryCreate(QueryBase):
     pass

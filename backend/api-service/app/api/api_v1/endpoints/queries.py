@@ -34,6 +34,7 @@ async def create_query(
             query_text=query.query_text,
             export_location=query.export_location,
             export_type=query.export_type,
+            ssh_hostname=query.ssh_hostname,
             status=QueryStatus.pending.value
         )
         
@@ -105,6 +106,7 @@ async def batch_rerun_queries(
                     query_text=query.query_text,
                     export_location=query.export_location,
                     export_type=query.export_type,
+                    ssh_hostname=query.ssh_hostname,
                     status=QueryStatus.pending.value,
                     created_at=datetime.utcnow()
                 )
@@ -248,6 +250,7 @@ async def rerun_query(
             query_text=query.query_text,
             export_location=query.export_location,
             export_type=query.export_type,
+            ssh_hostname=query.ssh_hostname,
             status=QueryStatus.pending.value,
             created_at=datetime.utcnow()
         )

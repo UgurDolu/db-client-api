@@ -27,6 +27,8 @@ interface UserSettings {
   export_type: string;
   export_location: string;
   max_parallel_queries: number;
+  ssh_hostname: string;
+  ssh_port: number;
   ssh_username: string;
   ssh_password: string;
   ssh_key: string;
@@ -37,6 +39,8 @@ const initialSettings: UserSettings = {
   export_type: 'csv',
   export_location: 'exports',
   max_parallel_queries: 3,
+  ssh_hostname: '',
+  ssh_port: 22,
   ssh_username: '',
   ssh_password: '',
   ssh_key: '',
@@ -59,7 +63,11 @@ export default function UserSettingsPage() {
   const fetchSettings = async () => {
     try {
       const data = await userApi.getSettings();
-      setSettings(data);
+      setSettings({
+        ...initialSettings,
+        ...data,
+        ssh_port: data.ssh_port ?? 22  // Ensure we have a default port if none is set
+      });
       logger.info('User settings fetched successfully');
     } catch (error) {
       logger.error('Failed to fetch user settings', error);
@@ -89,6 +97,8 @@ export default function UserSettingsPage() {
     setError('');
     try {
       const sshSettings = {
+        ssh_hostname: settings.ssh_hostname,
+        ssh_port: settings.ssh_port,
         ssh_username: settings.ssh_username,
         ssh_password: settings.ssh_password,
         ssh_key: settings.ssh_key,
@@ -212,6 +222,27 @@ export default function UserSettingsPage() {
                   SSH Settings
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <TextField
+                    fullWidth
+                    label="SSH Hostname"
+                    value={settings.ssh_hostname}
+                    onChange={handleTextChange('ssh_hostname')}
+                    helperText="Remote server hostname or IP address"
+                  />
+
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="SSH Port"
+                    value={settings.ssh_port}
+                    onChange={handleTextChange('ssh_port')}
+                    helperText="SSH port (default: 22)"
+                    inputProps={{
+                      min: 1,
+                      max: 65535
+                    }}
+                  />
+
                   <TextField
                     fullWidth
                     label="SSH Username"
