@@ -1,5 +1,4 @@
 YAPILACAKLAR;
-- api ve proceessorü ayırma
 - Settings sayfasını detaylandırma
 - eğer çıktı ismi varsa dosyayı o isimle kaydetme
 - eğer isim yoksa query id ve timestamp ile dosya kaydetme

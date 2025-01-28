@@ -1,11 +1,11 @@
 import oracledb
 import pandas as pd
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 from app.db.models import Query, UserSettings, QueryStatus
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-from sqlalchemy import select
+from sqlalchemy import select, func
 import os
 from pathlib import Path
 import logging
@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.services.file_transfer import FileTransferService
 import asyncssh
 from app.db.session import AsyncSessionLocal
+from collections import defaultdict
 
 # Configure to use thin mode (no Oracle Client required)
 oracledb.defaults.thin = True
@@ -24,42 +25,119 @@ logger.setLevel(logging.INFO)  # Set to INFO level for development
 
 class QueryExecutor:
     def __init__(self):
-        self.active_queries = {}
+        self.active_queries = {}  # query_id -> task
+        self.user_active_queries = defaultdict(set)  # user_id -> set of query_ids
         self.running = True
+        self.max_total_queries = settings.GLOBAL_MAX_PARALLEL_QUERIES
+        self.check_interval = settings.QUERY_LISTENER_CHECK_INTERVAL  # Store the interval in the instance
+
+    async def get_user_query_limit(self, session: AsyncSession, user_id: int) -> int:
+        """Get user's max parallel queries limit from settings"""
+        result = await session.execute(
+            select(UserSettings.max_parallel_queries)
+            .where(UserSettings.user_id == user_id)
+        )
+        user_limit = result.scalar_one_or_none()
+        return user_limit if user_limit is not None else settings.DEFAULT_MAX_PARALLEL_QUERIES
+
+    async def get_running_queries_count(self, session: AsyncSession) -> Dict[int, int]:
+        """Get count of currently running queries per user"""
+        result = await session.execute(
+            select(Query.user_id, func.count(Query.id))
+            .where(Query.status.in_([QueryStatus.running.value, QueryStatus.transferring.value]))
+            .group_by(Query.user_id)
+        )
+        return dict(result.all())
 
     async def process_queries(self):
-        """Process pending queries from the queue"""
+        """Process pending queries from the queue while respecting limits"""
         while self.running:
             try:
-                # Get pending queries
                 async with AsyncSessionLocal() as session:
+                    # Get all pending queries with their users' settings
                     result = await session.execute(
-                        select(Query)
+                        select(Query, UserSettings)
+                        .join(UserSettings, Query.user_id == UserSettings.user_id)
                         .where(Query.status == QueryStatus.pending.value)
+                        .order_by(Query.created_at)
                         .options(selectinload(Query.user))
-                        .limit(settings.DEFAULT_MAX_PARALLEL_QUERIES)
                     )
-                    pending_queries = result.scalars().all()
+                    pending_queries = result.unique().all()
 
-                for query in pending_queries:
-                    if query.id not in self.active_queries:
-                        # Start processing the query
-                        task = asyncio.create_task(self.execute_query(query))
-                        self.active_queries[query.id] = task
+                    # Group queries by user
+                    user_pending_queries = defaultdict(list)
+                    for query, settings in pending_queries:
+                        user_pending_queries[query.user_id].append((query, settings))
 
-                # Clean up completed tasks
-                completed = []
-                for query_id, task in self.active_queries.items():
-                    if task.done():
-                        completed.append(query_id)
-                for query_id in completed:
-                    del self.active_queries[query_id]
+                    # Calculate available slots
+                    total_running = sum(len(queries) for queries in self.user_active_queries.values())
+                    available_slots = max(0, self.max_total_queries - total_running)
+
+                    if available_slots > 0:
+                        # Process queries for each user fairly
+                        started_count = 0
+                        while available_slots > started_count:
+                            started_any = False
+                            
+                            # Try to start one query for each user that has pending queries
+                            for user_id, user_queries in user_pending_queries.items():
+                                if not user_queries:  # Skip if user has no more pending queries
+                                    continue
+                                
+                                current_user_queries = len(self.user_active_queries[user_id])
+                                user_limit = user_queries[0][1].max_parallel_queries or settings.DEFAULT_MAX_PARALLEL_QUERIES
+
+                                # Check if we can start a query for this user
+                                if current_user_queries < user_limit:
+                                    query, _ = user_queries[0]
+                                    if query.id not in self.active_queries:
+                                        # Start processing the query
+                                        task = asyncio.create_task(self.execute_query(query))
+                                        self.active_queries[query.id] = task
+                                        self.user_active_queries[user_id].add(query.id)
+                                        started_count += 1
+                                        started_any = True
+                                        
+                                        # Remove the started query from pending list
+                                        user_queries.pop(0)
+                                        
+                                        logger.info(f"Started query {query.id} for user {user_id} "
+                                                  f"(User running: {current_user_queries + 1}/{user_limit}, "
+                                                  f"Total running: {total_running + started_count}/{self.max_total_queries})")
+
+                                        if started_count >= available_slots:
+                                            break
+
+                            # If we couldn't start any new queries in this round, break
+                            if not started_any:
+                                break
+
+                    # Clean up completed tasks
+                    completed = []
+                    for query_id, task in self.active_queries.items():
+                        if task.done():
+                            try:
+                                # Check if the task raised any exception
+                                await task
+                            except Exception as e:
+                                logger.error(f"Query {query_id} failed with error: {str(e)}")
+                            completed.append(query_id)
+                    
+                    for query_id in completed:
+                        # Find and remove the query from user's active queries
+                        for user_id, queries in self.user_active_queries.items():
+                            if query_id in queries:
+                                queries.remove(query_id)
+                                if not queries:  # If user has no more active queries
+                                    del self.user_active_queries[user_id]
+                                break
+                        del self.active_queries[query_id]
 
             except Exception as e:
                 logger.error(f"Error in query processing loop: {str(e)}", exc_info=True)
 
             # Wait before checking for new queries
-            await asyncio.sleep(settings.QUERY_LISTENER_CHECK_INTERVAL)
+            await asyncio.sleep(self.check_interval)  # Use the instance variable instead
 
     async def execute_query(self, query: Query) -> bool:
         """Execute a single query"""
@@ -93,20 +171,26 @@ class QueryExecutor:
                 df = pd.DataFrame(rows, columns=columns)
 
                 # Save and transfer results
-                tmp_file_path = await self._save_results(df, query, user_settings)
+                tmp_file_path, result_metadata = await self._save_results(df, query, user_settings)
+                
+                # Calculate final file path based on user settings or query-specific path
+                final_path = query.export_location or user_settings.export_location
+                final_filename = f"query_{query.id}_result.{query.export_type or 'csv'}"
+                final_file_path = os.path.join(final_path, final_filename)
+                result_metadata["final_file_path"] = final_file_path.replace("\\", "/")  # Normalize path separators
                 
                 # Update status to transferring
                 await self._update_query_status(
                     query.id,
                     QueryStatus.transferring.value,
-                    result_metadata={"tmp_file_path": str(tmp_file_path)}
+                    result_metadata=result_metadata
                 )
 
                 # Transfer file
                 transfer_service = FileTransferService(user_settings)
                 success = await transfer_service.transfer_file(
                     str(tmp_file_path),
-                    f"query_{query.id}_result.{query.export_type or 'csv'}",
+                    final_filename,
                     str(query.user_id)
                 )
 
@@ -183,8 +267,8 @@ class QueryExecutor:
         
         return False
 
-    async def _save_results(self, df: pd.DataFrame, query: Query, user_settings: Optional[UserSettings]) -> Path:
-        """Save DataFrame to file based on export type"""
+    async def _save_results(self, df: pd.DataFrame, query: Query, user_settings: Optional[UserSettings]) -> tuple[Path, dict]:
+        """Save DataFrame to file based on export type and return metadata"""
         try:
             # Create temp directory for exports
             temp_dir = Path("tmp/exports")
@@ -206,7 +290,19 @@ class QueryExecutor:
             elif query.export_type == 'feather':
                 df.to_feather(filepath)
             
-            return filepath
+            # Calculate file size
+            file_size = os.path.getsize(filepath)
+            
+            # Prepare metadata
+            metadata = {
+                "tmp_file_path": str(filepath),
+                "file_size": file_size,
+                "rows": len(df),
+                "columns": len(df.columns),
+                "column_names": list(df.columns)
+            }
+            
+            return filepath, metadata
             
         except Exception as e:
             logger.error(f"Error saving results: {str(e)}", exc_info=True)
