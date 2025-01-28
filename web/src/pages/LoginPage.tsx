@@ -71,27 +71,43 @@ export default function LoginPage() {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: 'background.default',
+        pt: '64px'
+      }}
+    >
+      <Container maxWidth="xs">
         <Paper
           elevation={3}
           sx={{
-            padding: 4,
+            p: 4,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             width: '100%',
+            borderRadius: 2
           }}
         >
-          <Typography component="h1" variant="h5" gutterBottom>
-            Login
+          <Typography 
+            component="h1" 
+            variant="h5" 
+            gutterBottom
+            sx={{ fontWeight: 500 }}
+          >
+            Welcome Back
+          </Typography>
+          <Typography 
+            variant="body2" 
+            color="text.secondary" 
+            sx={{ mb: 3 }}
+          >
+            Sign in to continue to DB Client
           </Typography>
           <Box
             component="form"
@@ -169,7 +185,7 @@ export default function LoginPage() {
             </Button>
           </Box>
         </Paper>
-      </Box>
-    </Container>
+      </Container>
+    </Box>
   );
 } 

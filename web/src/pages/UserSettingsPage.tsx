@@ -125,148 +125,157 @@ export default function UserSettingsPage() {
 
   if (isLoading) {
     return (
-      <Container maxWidth="md" sx={{ mt: 4 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-          <CircularProgress />
-        </Box>
-      </Container>
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh',
+        pt: '64px'
+      }}>
+        <CircularProgress />
+      </Box>
     );
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          User Settings
-        </Typography>
-        <Typography color="text.secondary">
-          Configure your preferences for exports and SSH connections
-        </Typography>
-      </Box>
+    <Box sx={{ 
+      minHeight: '100vh',
+      pt: '84px',
+      pb: 4,
+      bgcolor: 'background.default'
+    }}>
+      <Container maxWidth="md">
+        <Box sx={{ mb: 4 }}>
+          <Typography variant="h5" component="h1" gutterBottom sx={{ fontWeight: 500 }}>
+            Settings
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Configure your preferences for exports and SSH connections
+          </Typography>
+        </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
 
-      <Grid container spacing={3}>
-        {/* Export Settings */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Export Settings
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <FormControl fullWidth>
-                  <InputLabel>Export Type</InputLabel>
-                  <Select
-                    value={settings.export_type}
-                    onChange={handleSelectChange('export_type')}
-                    label="Export Type"
-                  >
-                    <MenuItem value="csv">CSV</MenuItem>
-                    <MenuItem value="excel">Excel</MenuItem>
-                    <MenuItem value="json">JSON</MenuItem>
-                    <MenuItem value="feather">Feather</MenuItem>
-                  </Select>
-                </FormControl>
+        <Grid container spacing={3}>
+          {/* Export Settings */}
+          <Grid item xs={12}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 500 }}>
+                  Export Settings
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <FormControl fullWidth>
+                    <InputLabel>Export Type</InputLabel>
+                    <Select
+                      value={settings.export_type}
+                      onChange={handleSelectChange('export_type')}
+                      label="Export Type"
+                    >
+                      <MenuItem value="csv">CSV</MenuItem>
+                      <MenuItem value="excel">Excel</MenuItem>
+                      <MenuItem value="json">JSON</MenuItem>
+                      <MenuItem value="feather">Feather</MenuItem>
+                    </Select>
+                  </FormControl>
 
-                <TextField
-                  fullWidth
-                  label="Export Location"
-                  value={settings.export_location}
-                  onChange={handleTextChange('export_location')}
-                  helperText="Default location for exported files"
-                />
+                  <TextField
+                    fullWidth
+                    label="Export Location"
+                    value={settings.export_location}
+                    onChange={handleTextChange('export_location')}
+                    helperText="Default location for exported files"
+                  />
 
-                <TextField
-                  fullWidth
-                  type="number"
-                  label="Max Parallel Queries"
-                  value={settings.max_parallel_queries}
-                  onChange={handleTextChange('max_parallel_queries')}
-                  helperText="Maximum number of queries that can run in parallel"
-                />
-              </Box>
-            </CardContent>
-          </Card>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Max Parallel Queries"
+                    value={settings.max_parallel_queries}
+                    onChange={handleTextChange('max_parallel_queries')}
+                    helperText="Maximum number of queries that can run in parallel"
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+
+          {/* SSH Settings */}
+          <Grid item xs={12}>
+            <Card variant="outlined">
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ fontWeight: 500 }}>
+                  SSH Settings
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <TextField
+                    fullWidth
+                    label="SSH Username"
+                    value={settings.ssh_username}
+                    onChange={handleTextChange('ssh_username')}
+                  />
+
+                  <TextField
+                    fullWidth
+                    type="password"
+                    label="SSH Password"
+                    value={settings.ssh_password}
+                    onChange={handleTextChange('ssh_password')}
+                  />
+
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    label="SSH Key"
+                    value={settings.ssh_key}
+                    onChange={handleTextChange('ssh_key')}
+                    helperText="Paste your private SSH key here"
+                  />
+
+                  <TextField
+                    fullWidth
+                    type="password"
+                    label="SSH Key Passphrase"
+                    value={settings.ssh_key_passphrase}
+                    onChange={handleTextChange('ssh_key_passphrase')}
+                  />
+
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Button
+                      variant="outlined"
+                      startIcon={<VpnKeyIcon />}
+                      onClick={handleTestSSH}
+                      disabled={isTestingSSH}
+                    >
+                      {isTestingSSH ? 'Testing Connection...' : 'Test SSH Connection'}
+                    </Button>
+                    <Button
+                      variant="contained"
+                      startIcon={<SaveIcon />}
+                      onClick={handleSave}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
         </Grid>
 
-        {/* SSH Settings */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                SSH Settings
-              </Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <TextField
-                  fullWidth
-                  label="SSH Username"
-                  value={settings.ssh_username}
-                  onChange={handleTextChange('ssh_username')}
-                />
-
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="SSH Password"
-                  value={settings.ssh_password}
-                  onChange={handleTextChange('ssh_password')}
-                />
-
-                <TextField
-                  fullWidth
-                  multiline
-                  rows={4}
-                  label="SSH Key"
-                  value={settings.ssh_key}
-                  onChange={handleTextChange('ssh_key')}
-                  helperText="Paste your private SSH key here"
-                />
-
-                <TextField
-                  fullWidth
-                  type="password"
-                  label="SSH Key Passphrase"
-                  value={settings.ssh_key_passphrase}
-                  onChange={handleTextChange('ssh_key_passphrase')}
-                />
-
-                <Button
-                  variant="outlined"
-                  startIcon={<VpnKeyIcon />}
-                  onClick={handleTestSSH}
-                  disabled={isTestingSSH}
-                >
-                  {isTestingSSH ? 'Testing Connection...' : 'Test SSH Connection'}
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<SaveIcon />}
-          onClick={handleSave}
-          disabled={isSaving}
-        >
-          {isSaving ? 'Saving...' : 'Save Settings'}
-        </Button>
-      </Box>
-
-      <Snackbar
-        open={!!successMessage}
-        autoHideDuration={6000}
-        onClose={() => setSuccessMessage('')}
-        message={successMessage}
-      />
-    </Container>
+        <Snackbar
+          open={Boolean(successMessage)}
+          autoHideDuration={6000}
+          onClose={() => setSuccessMessage('')}
+          message={successMessage}
+        />
+      </Container>
+    </Box>
   );
 } 

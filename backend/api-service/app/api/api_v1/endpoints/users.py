@@ -4,10 +4,32 @@ from app.db.session import get_db
 from app.api.api_v1.endpoints.auth import get_current_user
 from app.schemas.user import User, UserSettings, SSHSettingsUpdate
 from app.crud.user import update_user_settings, get_user_settings
+from pydantic import BaseModel
 import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+class UserProfile(BaseModel):
+    id: int
+    email: str
+    is_active: bool
+    settings: UserSettings | None = None
+
+    class Config:
+        from_attributes = True
+
+@router.get("/profile", response_model=UserProfile)
+async def read_user_profile(
+    current_user: User = Depends(get_current_user),
+):
+    """Get current user's profile information"""
+    return UserProfile(
+        id=current_user.id,
+        email=current_user.email,
+        is_active=current_user.is_active,
+        settings=current_user.settings
+    )
 
 @router.get("/settings", response_model=UserSettings)
 async def read_user_settings(

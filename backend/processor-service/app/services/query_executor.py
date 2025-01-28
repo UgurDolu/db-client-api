@@ -203,7 +203,7 @@ class QueryExecutor:
             finally:
                 if cursor:
                     cursor.close()
-
+                
         except Exception as e:
             logger.error(f"Error executing query {query.id}: {str(e)}", exc_info=True)
             await self._update_query_status(
@@ -212,7 +212,7 @@ class QueryExecutor:
                 error_message=str(e)
             )
             return False
-
+            
         finally:
             if oracle_conn:
                 try:
@@ -233,30 +233,30 @@ class QueryExecutor:
         while retry_count < max_retries:
             try:
                 async with AsyncSessionLocal() as session:
-                    async with session.begin():
-                        result = await session.execute(
+                async with session.begin():
+                    result = await session.execute(
                             select(Query).where(Query.id == query_id)
-                        )
-                        query = result.scalar_one()
-                        
-                        query.status = status
-                        if error_message:
-                            query.error_message = error_message
-                        if result_metadata:
+                    )
+                    query = result.scalar_one()
+                    
+                    query.status = status
+                    if error_message:
+                        query.error_message = error_message
+                    if result_metadata:
                             existing_metadata = query.result_metadata or {}
                             existing_metadata.update(result_metadata)
                             query.result_metadata = existing_metadata
-                        
+                    
                         if status == QueryStatus.running.value:
-                            query.started_at = datetime.utcnow()
+                        query.started_at = datetime.utcnow()
                         elif status in [QueryStatus.completed.value, QueryStatus.failed.value]:
-                            query.completed_at = datetime.utcnow()
-                        
-                        await session.commit()
+                        query.completed_at = datetime.utcnow()
+                    
+                    await session.commit()
                         logger.info(f"Status updated successfully for query {query_id} to {status}")
                         return True
-                        
-            except Exception as e:
+                    
+        except Exception as e:
                 retry_count += 1
                 logger.error(f"Error updating query status (attempt {retry_count}): {str(e)}")
                 if retry_count < max_retries:
@@ -284,7 +284,7 @@ class QueryExecutor:
             if query.export_type == 'csv' or not query.export_type:
                 df.to_csv(filepath, index=False)
             elif query.export_type == 'excel':
-                df.to_excel(filepath, index=False, engine='openpyxl')
+                    df.to_excel(filepath, index=False, engine='openpyxl')
             elif query.export_type == 'json':
                 df.to_json(filepath, orient='records')
             elif query.export_type == 'feather':

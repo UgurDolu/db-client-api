@@ -35,6 +35,10 @@ import {
   TableSortLabel,
   Checkbox,
   Menu,
+  Avatar,
+  useTheme,
+  useMediaQuery,
+  Drawer,
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -49,6 +53,8 @@ import {
   Delete as DeleteIcon,
   PlayArrow as RunIcon,
   Upload as TransferringIcon,
+  Person as PersonIcon,
+  Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -183,6 +189,9 @@ export default function QueriesPage() {
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [selectedQueries, setSelectedQueries] = useState<number[]>([]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { user } = useAuth();
 
   const { data: queries, isLoading, refetch } = useQuery({
     queryKey: ['queries'],
@@ -480,11 +489,22 @@ export default function QueriesPage() {
 
   const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      setSelectedQueries(filteredAndSortedQueries?.map(q => q.id) || []);
+      // Sadece mevcut sayfadaki sorguları seç
+      const currentPageQueries = paginatedQueries?.map(q => q.id) || [];
+      setSelectedQueries(currentPageQueries);
     } else {
       setSelectedQueries([]);
     }
   };
+
+  const isAllSelected = 
+    Boolean(paginatedQueries?.length) && 
+    paginatedQueries?.every(query => selectedQueries.includes(query.id));
+
+  const isPartiallySelected = 
+    selectedQueries.length > 0 && 
+    paginatedQueries?.some(query => selectedQueries.includes(query.id)) &&
+    !isAllSelected;
 
   const handleBatchRerun = async () => {
     setError('');
@@ -599,97 +619,345 @@ export default function QueriesPage() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="h4" component="h1">
-            My Queries
-          </Typography>
-          <Tooltip title="Refresh queries">
-            <IconButton 
-              onClick={handleManualRefresh} 
-              disabled={isLoading || isManualRefetching}
-              size="small"
-              color={hasActiveQueries ? "primary" : "default"}
+    <Box sx={{ 
+      display: 'flex', 
+      flexDirection: 'column',
+      flex: 1,
+      width: '100%',
+      mt: '64px' // Toolbar height
+    }}>
+      <Container 
+        maxWidth="xl" 
+        sx={{ 
+          flex: 1, 
+          pb: 4,
+          mx: 'auto',
+          width: '100%',
+          px: { xs: 2, sm: 3, md: 4 },
+          '@media (max-width: 600px)': {
+            px: 1,
+          }
+        }}
+      >
+        {/* Action Bar */}
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: 2,
+          mb: 3,
+          mt: 2
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => setIsCreateModalOpen(true)}
             >
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-          {(isLoading || isManualRefetching) && (
-            <CircularProgress size={20} />
-          )}
-          {stats && (hasActiveQueries || stats.running_queries > 0 || stats.queued_queries > 0) && (
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {stats.running_queries > 0 && (
-                <Chip
-                  size="small"
-                  icon={<RunningIcon />}
-                  label={`${stats.running_queries} Running`}
-                  color="primary"
-                />
-              )}
-              {stats.queued_queries > 0 && (
-                <Chip
-                  size="small"
-                  icon={<QueuedIcon />}
-                  label={`${stats.queued_queries} Queued`}
-                  color="warning"
-                />
-              )}
-            </Box>
-          )}
-        </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          {selectedQueries.length > 0 && (
-            <>
-              <Button
-                variant="outlined"
-                startIcon={<RunIcon />}
-                onClick={handleBatchRerun}
+              New Query
+            </Button>
+            <Tooltip title="Refresh queries">
+              <IconButton 
+                onClick={handleManualRefresh} 
+                disabled={isLoading || isManualRefetching}
+                color={hasActiveQueries ? "primary" : "default"}
               >
-                Rerun Selected ({selectedQueries.length})
-              </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<DeleteIcon />}
-                onClick={handleBatchDelete}
-              >
-                Delete Selected ({selectedQueries.length})
-              </Button>
-            </>
-          )}
-          <Button
-            variant="outlined"
-            startIcon={<FilterIcon />}
-            onClick={() => setIsFilterDrawerOpen(true)}
-          >
-            Filters
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<AddIcon />}
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            New Query
-          </Button>
-          <Button variant="outlined" color="primary" onClick={handleLogout}>
-            Logout
-          </Button>
-        </Box>
-      </Box>
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+            {(isLoading || isManualRefetching) && (
+              <CircularProgress size={24} />
+            )}
+          </Box>
 
-      {/* Filter Dialog */}
-      <Dialog
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            {!isMobile && (
+              <>
+                {selectedQueries.length > 0 && (
+                  <>
+                    <Button
+                      variant="outlined"
+                      startIcon={<RunIcon />}
+                      onClick={handleBatchRerun}
+                    >
+                      Rerun ({selectedQueries.length})
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<DeleteIcon />}
+                      onClick={handleBatchDelete}
+                    >
+                      Delete ({selectedQueries.length})
+                    </Button>
+                  </>
+                )}
+                <Button
+                  variant="outlined"
+                  startIcon={<FilterIcon />}
+                  onClick={() => setIsFilterDrawerOpen(true)}
+                >
+                  Filters
+                </Button>
+              </>
+            )}
+            <Button 
+              variant="outlined" 
+              color="inherit" 
+              onClick={handleLogout}
+              sx={{ borderColor: 'divider' }}
+            >
+              Logout
+            </Button>
+          </Box>
+        </Box>
+
+        {/* Main Content */}
+        <Paper elevation={0} variant="outlined">
+          {(isLoading || isManualRefetching || hasActiveQueries) && (
+            <LinearProgress sx={{ borderTopLeftRadius: 4, borderTopRightRadius: 4 }} />
+          )}
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      indeterminate={isPartiallySelected}
+                      checked={isAllSelected}
+                      onChange={handleSelectAll}
+                    />
+                  </TableCell>
+                  {!isMobile && (
+                    <TableCell>
+                      <TableSortLabel
+                        active={sort.field === 'id'}
+                        direction={sort.direction}
+                        onClick={() => handleSort('id')}
+                      >
+                        ID
+                      </TableSortLabel>
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <TableSortLabel
+                      active={sort.field === 'query_text'}
+                      direction={sort.direction}
+                      onClick={() => handleSort('query_text')}
+                    >
+                      Query
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell>
+                    <TableSortLabel
+                      active={sort.field === 'status'}
+                      direction={sort.direction}
+                      onClick={() => handleSort('status')}
+                    >
+                      Status
+                    </TableSortLabel>
+                  </TableCell>
+                  {!isMobile && (
+                    <>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sort.field === 'created_at'}
+                          direction={sort.direction}
+                          onClick={() => handleSort('created_at')}
+                        >
+                          Created
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell>Results</TableCell>
+                    </>
+                  )}
+                  <TableCell align="right">Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={isMobile ? 4 : 7} align="center" sx={{ py: 8 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                        <CircularProgress size={40} />
+                        <Typography color="text.secondary">
+                          Loading queries...
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : queries?.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={isMobile ? 4 : 7} align="center" sx={{ py: 8 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                        <Typography color="text.secondary">
+                          No queries found
+                        </Typography>
+                        <Button
+                          variant="outlined"
+                          startIcon={<AddIcon />}
+                          onClick={() => setIsCreateModalOpen(true)}
+                        >
+                          Create your first query
+                        </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedQueries?.map(query => (
+                    <TableRow 
+                      key={query.id}
+                      onClick={() => handleRowClick(query)}
+                      sx={{
+                        cursor: 'pointer',
+                        '&:hover': {
+                          bgcolor: 'action.hover',
+                        },
+                      }}
+                    >
+                      <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedQueries.includes(query.id)}
+                          onChange={() => handleSelectQuery(query.id)}
+                        />
+                      </TableCell>
+                      {!isMobile && (
+                        <TableCell>{query.id}</TableCell>
+                      )}
+                      <TableCell>
+                        <Tooltip title={query.query_text}>
+                          <Typography
+                            sx={{
+                              maxWidth: isMobile ? 150 : 300,
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {query.query_text}
+                          </Typography>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          icon={getStatusIcon(query.status)}
+                          label={query.status}
+                          color={getStatusColor(query.status) as any}
+                          size="small"
+                          sx={{ minWidth: 90 }}
+                        />
+                      </TableCell>
+                      {!isMobile && (
+                        <>
+                          <TableCell>{formatDateTime(query.created_at)}</TableCell>
+                          <TableCell>
+                            {query.status === 'COMPLETED' && query.result_metadata?.file_path && (
+                              <Button
+                                variant="text"
+                                size="small"
+                                startIcon={<DownloadIcon />}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownload(query);
+                                }}
+                              >
+                                Download
+                              </Button>
+                            )}
+                            {query.status === 'FAILED' && (
+                              <Tooltip title={query.error_message}>
+                                <Typography 
+                                  color="error" 
+                                  variant="caption"
+                                  sx={{ 
+                                    cursor: 'help',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 0.5,
+                                  }}
+                                >
+                                  <ErrorIcon fontSize="small" />
+                                  Error
+                                </Typography>
+                              </Tooltip>
+                            )}
+                          </TableCell>
+                        </>
+                      )}
+                      <TableCell align="right">
+                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                          <Tooltip title="Rerun query">
+                            <IconButton
+                              size="small"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRerunSingle(query.id, e);
+                              }}
+                              disabled={['RUNNING', 'QUEUED'].includes(query.status)}
+                            >
+                              <RunIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete query">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteSingle(query.id, e);
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <Box sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            p: 2,
+            borderTop: 1,
+            borderColor: 'divider'
+          }}>
+            <Typography variant="body2" color="text.secondary">
+              {filteredAndSortedQueries?.length || 0} queries found
+            </Typography>
+            <TablePagination
+              component="div"
+              count={filteredAndSortedQueries?.length || 0}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              rowsPerPageOptions={[5, 10, 25, 50]}
+            />
+          </Box>
+        </Paper>
+      </Container>
+
+      {/* Filter Drawer - Mobile */}
+      <Drawer
+        anchor={isMobile ? 'left' : 'right'}
         open={isFilterDrawerOpen}
         onClose={() => setIsFilterDrawerOpen(false)}
-        maxWidth="sm"
-        fullWidth
+        PaperProps={{
+          sx: { width: isMobile ? '100%' : 400 }
+        }}
       >
-        <DialogTitle>Filter Queries</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 2 }}>
+        <Box sx={{ p: 3 }}>
+          <Typography variant="h6" gutterBottom>
+            Filter Queries
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
             <TextField
               fullWidth
               label="Search"
@@ -730,7 +998,7 @@ export default function QueriesPage() {
               </Select>
             </FormControl>
 
-            <Box sx={{ display: 'flex', gap: 2 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <TextField
                 type="datetime-local"
                 label="Start Date"
@@ -749,260 +1017,31 @@ export default function QueriesPage() {
               />
             </Box>
           </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button 
-            onClick={() => {
-              setFilters({
-                status: [],
-                dateRange: { start: '', end: '' },
-                searchText: ''
-              });
-              setPage(0);
-            }}
-          >
-            Clear All
-          </Button>
-          <Button onClick={() => setIsFilterDrawerOpen(false)}>
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Paper>
-        {(isLoading || isManualRefetching || hasActiveQueries) && (
-          <LinearProgress sx={{ borderTopLeftRadius: 4, borderTopRightRadius: 4 }} />
-        )}
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    indeterminate={
-                      selectedQueries.length > 0 &&
-                      selectedQueries.length < (filteredAndSortedQueries?.length || 0)
-                    }
-                    checked={
-                      (filteredAndSortedQueries?.length || 0) > 0 &&
-                      selectedQueries.length === (filteredAndSortedQueries?.length || 0)
-                    }
-                    onChange={handleSelectAll}
-                  />
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sort.field === 'id'}
-                    direction={sort.direction}
-                    onClick={() => handleSort('id')}
-                  >
-                    ID
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sort.field === 'query_text'}
-                    direction={sort.direction}
-                    onClick={() => handleSort('query_text')}
-                  >
-                    Query
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sort.field === 'status'}
-                    direction={sort.direction}
-                    onClick={() => handleSort('status')}
-                  >
-                    Status
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sort.field === 'created_at'}
-                    direction={sort.direction}
-                    onClick={() => handleSort('created_at')}
-                  >
-                    Created At
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sort.field === 'started_at'}
-                    direction={sort.direction}
-                    onClick={() => handleSort('started_at')}
-                  >
-                    Started At
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>
-                  <TableSortLabel
-                    active={sort.field === 'completed_at'}
-                    direction={sort.direction}
-                    onClick={() => handleSort('completed_at')}
-                  >
-                    Completed At
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell>Results</TableCell>
-                <TableCell>Actions</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                      <CircularProgress size={40} />
-                      <Typography color="text.secondary">
-                        Loading queries...
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ) : queries?.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                      <Typography color="text.secondary">
-                        No queries found
-                      </Typography>
-                      <Button
-                        variant="outlined"
-                        startIcon={<AddIcon />}
-                        onClick={() => setIsCreateModalOpen(true)}
-                      >
-                        Create your first query
-                      </Button>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ) : paginatedQueries?.map((query) => (
-                <TableRow 
-                  key={query.id}
-                  onClick={() => handleRowClick(query)}
-                  sx={{
-                    backgroundColor: query.status.toLowerCase() === 'failed' ? 'error.main' : undefined,
-                    '&:hover': {
-                      backgroundColor: query.status.toLowerCase() === 'failed' 
-                        ? 'error.dark' 
-                        : 'action.hover',
-                      cursor: 'pointer',
-                    },
-                  }}
-                >
-                  <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
-                    <Checkbox
-                      checked={selectedQueries.includes(query.id)}
-                      onChange={() => handleSelectQuery(query.id)}
-                    />
-                  </TableCell>
-                  <TableCell>{query.id}</TableCell>
-                  <TableCell>
-                    <Tooltip title={query.query_text}>
-                      <Typography
-                        sx={{
-                          maxWidth: 300,
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          cursor: 'help',
-                        }}
-                      >
-                        {query.query_text}
-                      </Typography>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell>
-                    <Tooltip title={getStatusText(query.status)}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Chip
-                          icon={getStatusIcon(query.status)}
-                          label={query.status}
-                          color={getStatusColor(query.status) as any}
-                          size="small"
-                          sx={{ minWidth: 100 }}
-                        />
-                        {['PENDING', 'QUEUED', 'RUNNING', 'TRANSFERRING'].includes(query.status.toUpperCase()) && (
-                          <CircularProgress size={16} />
-                        )}
-                      </Box>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell>{formatDateTime(query.created_at)}</TableCell>
-                  <TableCell>{formatDateTime(query.started_at)}</TableCell>
-                  <TableCell>{formatDateTime(query.completed_at)}</TableCell>
-                  <TableCell>
-                    {query.status === 'COMPLETED' && query.result_metadata?.file_path && (
-                      <Button
-                        variant="text"
-                        size="small"
-                        startIcon={<DownloadIcon />}
-                        onClick={() => handleDownload(query)}
-                      >
-                        Download
-                      </Button>
-                    )}
-                    {query.status === 'FAILED' && (
-                      <Tooltip title={query.error_message}>
-                        <Typography 
-                          color="error" 
-                          variant="caption"
-                          sx={{ 
-                            cursor: 'help',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 0.5,
-                          }}
-                        >
-                          <ErrorIcon fontSize="small" />
-                          {query.error_message}
-                        </Typography>
-                      </Tooltip>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <Tooltip title="Rerun query">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleRerunSingle(query.id, e)}
-                          disabled={['RUNNING', 'QUEUED'].includes(query.status)}
-                        >
-                          <RunIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete query">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={(e) => handleDeleteSingle(query.id, e)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            {filteredAndSortedQueries?.length || 0} queries found
-          </Typography>
-          <TablePagination
-            component="div"
-            count={filteredAndSortedQueries?.length || 0}
-            page={page}
-            onPageChange={handleChangePage}
-            rowsPerPage={rowsPerPage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-            rowsPerPageOptions={[5, 10, 25, 50]}
-          />
+          <Box sx={{ display: 'flex', gap: 2, mt: 4 }}>
+            <Button 
+              fullWidth
+              variant="outlined"
+              onClick={() => {
+                setFilters({
+                  status: [],
+                  dateRange: { start: '', end: '' },
+                  searchText: ''
+                });
+                setPage(0);
+              }}
+            >
+              Clear All
+            </Button>
+            <Button 
+              fullWidth
+              variant="contained" 
+              onClick={() => setIsFilterDrawerOpen(false)}
+            >
+              Apply
+            </Button>
+          </Box>
         </Box>
-      </Paper>
+      </Drawer>
 
       {/* Create Query Modal */}
       <Dialog 
@@ -1270,6 +1309,6 @@ export default function QueriesPage() {
           </>
         )}
       </Dialog>
-    </Container>
+    </Box>
   );
 } 

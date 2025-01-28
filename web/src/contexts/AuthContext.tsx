@@ -1,10 +1,12 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios, { AxiosError } from 'axios';
 import { logger } from '../services/logger';
+import api from '../services/api';
+import { User } from '../types/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
-  user: any | null;
+  user: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -29,7 +31,7 @@ const getErrorMessage = (error: any): string => {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -45,13 +47,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUserData = async () => {
     try {
       logger.debug('Fetching user data');
-      const response = await axios.get('http://localhost:8000/api/users/settings', {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-        },
-      });
-      logger.info('User data fetched successfully', { userId: response.data.id });
-      setUser(response.data);
+      const userData = await api.user.getProfile();
+      logger.info('User data fetched successfully', { userId: userData.id });
+      setUser(userData);
     } catch (error) {
       const errorMessage = getErrorMessage(error);
       logger.error('Error fetching user data', { 
@@ -59,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         details: {
           code: (error as AxiosError)?.code,
           status: (error as AxiosError)?.response?.status,
-          url: 'http://localhost:8000/api/users/settings'
+          url: '/users/profile'
         }
       });
       logout();

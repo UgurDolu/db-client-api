@@ -49,6 +49,11 @@ export const authApi = {
 
 // User Settings API
 export const userApi = {
+    getProfile: async (): Promise<User> => {
+        const response = await api.get<User>('/users/profile');
+        return response.data;
+    },
+
     getSettings: async (): Promise<UserSettings> => {
         const response = await api.get<UserSettings>('/users/settings');
         return response.data;
