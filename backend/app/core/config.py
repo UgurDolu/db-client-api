@@ -24,6 +24,7 @@ class Settings(BaseSettings):
 
     # Queue Settings
     DEFAULT_MAX_PARALLEL_QUERIES: int = 3
+    GLOBAL_MAX_PARALLEL_QUERIES: int = 50  # Maximum total parallel queries across all users
     DEFAULT_QUEUE_TIMEOUT: int = 3600  # 1 hour
     
     # Export Settings

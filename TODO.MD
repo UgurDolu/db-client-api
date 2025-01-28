@@ -1,9 +1,12 @@
 YAPILACAKLAR;
-- GLOBAL PARALEL QUERRY LİMİTİNİ AYARLAMA
-- KULLANICI PARALEL QUERRY LİMİTİNİ AYARLAMA
-- KULLANICI SETTİNGS SAYFASI AYARLAMA
-- KULLANICI DEFAULT SETTINGSLERI AYARLAMA
-- asyncssh ENTEGRASYONU
+- Settings sayfasını detaylandırma
+- eğer çıktı ismi varsa dosyayı o isimle kaydetme
+- eğer isim yoksa query id ve timestamp ile dosya kaydetme
+- api ve proceessorü ayırma
+- eğer dosya aktarımı fail olursa tmp de yer alan dosyayı sil başarılıysa gene sil
+- farklı serverlara ssh ile dosya aktarımı kullanıcı ayarlarında belirtilir
+- query assign edilirken query özelinde optional olarak expport alınacağı yer verilebilir eğer yoksa default ayarlar
+
 
 ### Cursor
 
