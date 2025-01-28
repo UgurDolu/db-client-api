@@ -5,28 +5,39 @@ from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
 
-# Add the parent directory to Python path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the necessary directories to the Python path
+api_service_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+backend_dir = os.path.abspath(os.path.join(api_service_dir, '..'))
 
+if api_service_dir not in sys.path:
+    sys.path.insert(0, api_service_dir)
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
+# Import the Base and models
 from app.db.base import Base
 from app.core.config import settings
 
+# this is the Alembic Config object, which provides
+# access to the values within the .ini file in use.
 config = context.config
 
+# Interpret the config file for Python logging.
+# This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# add your model's MetaData object here
+# for 'autogenerate' support
 target_metadata = Base.metadata
 
-# Set the database URL in Alembic config
-db_url = settings.get_database_uri()
-if db_url.startswith('postgresql+asyncpg'):
-    db_url = db_url.replace('postgresql+asyncpg', 'postgresql')
-
-config.set_main_option("sqlalchemy.url", db_url)
-
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    """Run migrations in 'offline' mode."""
+    # Convert asyncpg URL to psycopg2
+    url = settings.SQLALCHEMY_DATABASE_URI
+    if url.startswith('postgresql+asyncpg'):
+        url = url.replace('postgresql+asyncpg', 'postgresql')
+    
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -38,8 +49,13 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
+    """Run migrations in 'online' mode."""
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = db_url
+    # Convert asyncpg URL to psycopg2
+    url = settings.SQLALCHEMY_DATABASE_URI
+    if url.startswith('postgresql+asyncpg'):
+        url = url.replace('postgresql+asyncpg', 'postgresql')
+    configuration["sqlalchemy.url"] = url
     
     connectable = engine_from_config(
         configuration,
@@ -50,8 +66,7 @@ def run_migrations_online() -> None:
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
+            target_metadata=target_metadata
         )
 
         with context.begin_transaction():

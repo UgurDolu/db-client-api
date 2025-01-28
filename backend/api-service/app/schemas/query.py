@@ -12,31 +12,40 @@ class QueryStatus(str, Enum):
     failed = "failed"
 
 class QueryBase(BaseModel):
+    query_text: str
     db_username: str
     db_password: str
     db_tns: str
-    query_text: str
     export_location: Optional[str] = None
     export_type: Optional[str] = None
+    export_filename: Optional[str] = None  # Optional custom filename for exported file
     ssh_hostname: Optional[str] = None  # Optional SSH hostname for remote execution
 
 class QueryCreate(QueryBase):
     pass
 
 class QueryUpdate(BaseModel):
-    status: Optional[QueryStatus] = None
+    query_text: Optional[str] = None
+    db_username: Optional[str] = None
+    db_password: Optional[str] = None
+    db_tns: Optional[str] = None
+    export_location: Optional[str] = None
+    export_type: Optional[str] = None
+    export_filename: Optional[str] = None
+    ssh_hostname: Optional[str] = None
+    status: Optional[str] = None
     error_message: Optional[str] = None
     result_metadata: Optional[Dict[str, Any]] = None
 
 class Query(QueryBase):
     id: int
     user_id: int
-    status: QueryStatus
-    created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    status: str = QueryStatus.pending.value
     error_message: Optional[str] = None
     result_metadata: Optional[Dict[str, Any]] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

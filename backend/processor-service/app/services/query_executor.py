@@ -195,9 +195,25 @@ class QueryExecutor:
                         (user_settings.export_location if user_settings else None) or 
                         settings.DEFAULT_EXPORT_LOCATION
                     )
-                    final_filename = f"query_{query.id}_result.{query.export_type or 'csv'}"
-                    final_file_path = os.path.join(final_path, final_filename)
-                    result_metadata["final_file_path"] = final_file_path.replace("\\", "/")  # Normalize path separators
+
+                    # Generate filename based on query settings or default format
+                    if query.export_filename:
+                        # Use custom filename from query
+                        base_filename = query.export_filename
+                        if query.export_type and not base_filename.endswith(f".{query.export_type}"):
+                            filename = f"{base_filename}.{query.export_type}"
+                        else:
+                            filename = base_filename
+                        logger.info(f"Using custom filename: {filename}")
+                    else:
+                        # Generate default filename with timestamp
+                        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+                        filename = f"{query.id}_query_{timestamp}.{query.export_type or 'csv'}"
+                        logger.info(f"Using default filename format: {filename}")
+
+                    final_file_path = os.path.join(final_path, filename).replace("\\", "/")
+                    result_metadata["final_file_path"] = final_file_path
+                    logger.info(f"Final file path: {final_file_path}")
                     
                     # Update status to transferring
                     await self._update_query_status(
@@ -211,9 +227,9 @@ class QueryExecutor:
                     
                     success = await transfer_service.transfer_file(
                         str(tmp_file_path),
-                        final_filename,
+                        filename,  # Pass just the filename, let transfer service handle full path
                         str(query.user_id),
-                        query  # Pass the query object
+                        query
                     )
 
                     if success:

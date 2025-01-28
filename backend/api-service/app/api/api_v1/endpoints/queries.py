@@ -2,48 +2,55 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.schemas.query import (
-    QueryCreate, Query, QueryResult, QueryBatchDelete,
+    QueryCreate, Query as QuerySchema, QueryResult, QueryBatchDelete,
     QueryBatchRerun, BatchOperationResponse, QueryStats,
     QueryStatus
 )
-from app.db.models import Query as QueryModel, User as UserModel
+from shared.models import Query as QueryModel, User as UserModel
 from app.api.api_v1.endpoints.auth import get_current_user
 from sqlalchemy import select, update, delete, func
 from typing import List, Dict
 import logging
 from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/", response_model=Query)
+@router.post("/", response_model=QuerySchema)
 async def create_query(
-    query: QueryCreate,
+    *,
+    db: AsyncSession = Depends(get_db),
+    query_in: QueryCreate,
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Create a new query and submit it for processing"""
+) -> Any:
+    """
+    Create a new query.
+
+    - **query_text**: SQL query to execute
+    - **db_username**: Database username
+    - **db_password**: Database password
+    - **db_tns**: Database TNS connection string
+    - **export_location**: Optional custom export location
+    - **export_type**: Optional export file type (csv, excel, json, feather)
+    - **export_filename**: Optional custom filename for the exported file (extension will be added automatically)
+    - **ssh_hostname**: Optional SSH hostname for remote execution
+    """
     logger.info(f"Creating new query for user {current_user.id}")
     try:
         # Create new query
-        db_query = QueryModel(
+        query = QueryModel(
+            **query_in.model_dump(),
             user_id=current_user.id,
-            db_username=query.db_username,
-            db_password=query.db_password,
-            db_tns=query.db_tns,
-            query_text=query.query_text,
-            export_location=query.export_location,
-            export_type=query.export_type,
-            ssh_hostname=query.ssh_hostname,
             status=QueryStatus.pending.value
         )
         
-        db.add(db_query)
+        db.add(query)
         await db.commit()
-        await db.refresh(db_query)
-        logger.info(f"Created query {db_query.id} for user {current_user.id}")
+        await db.refresh(query)
+        logger.info(f"Created query {query.id} for user {current_user.id}")
         
-        return db_query
+        return query
             
     except Exception as e:
         logger.error(f"Error creating query: {str(e)}", exc_info=True)
@@ -52,7 +59,7 @@ async def create_query(
             detail=f"Failed to create query: {str(e)}"
         )
 
-@router.get("/", response_model=List[Query])
+@router.get("/", response_model=List[QuerySchema])
 async def list_queries(
     current_user: UserModel = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
@@ -75,72 +82,72 @@ async def list_queries(
 
 @router.post("/batch/rerun", response_model=BatchOperationResponse)
 async def batch_rerun_queries(
-    query_ids: QueryBatchRerun,
+    *,
+    db: AsyncSession = Depends(get_db),
+    batch_data: QueryBatchRerun,
     current_user: UserModel = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
-    """Rerun multiple queries in batch"""
-    successful_ids = []
-    failed_ids: Dict[int, str] = {}
+) -> Any:
+    """
+    Rerun multiple queries in batch.
 
-    try:
-        # Get all queries
-        result = await db.execute(
-            select(QueryModel)
-            .where(
-                QueryModel.id.in_(query_ids.query_ids),
-                QueryModel.user_id == current_user.id
-            )
-        )
-        queries = result.scalars().all()
-        
-        # Create new queries for each original query
-        for query in queries:
-            try:
-                # Create a new query with the same parameters
-                new_query = QueryModel(
-                    user_id=current_user.id,
-                    db_username=query.db_username,
-                    db_password=query.db_password,
-                    db_tns=query.db_tns,
-                    query_text=query.query_text,
-                    export_location=query.export_location,
-                    export_type=query.export_type,
-                    ssh_hostname=query.ssh_hostname,
-                    status=QueryStatus.pending.value,
-                    created_at=datetime.utcnow()
+    - **query_ids**: List of query IDs to rerun
+    - All original query parameters will be preserved, including:
+        - query_text
+        - db_username
+        - db_password
+        - db_tns
+        - export_location
+        - export_type
+        - export_filename
+        - ssh_hostname
+    """
+    successful_ids = []
+    failed_ids = {}
+
+    for query_id in batch_data.query_ids:
+        try:
+            # Get original query
+            result = await db.execute(
+                select(QueryModel)
+                .where(
+                    QueryModel.id == query_id,
+                    QueryModel.user_id == current_user.id
                 )
-                
-                db.add(new_query)
-                await db.flush()  # Get the ID without committing
-                successful_ids.append(query.id)
-                logger.info(f"Created new query {new_query.id} as rerun of {query.id}")
-                
-            except Exception as e:
-                logger.error(f"Failed to rerun query {query.id}: {str(e)}")
-                failed_ids[query.id] = str(e)
-        
-        # Commit all successful queries at once
-        if successful_ids:
+            )
+            original_query = result.scalar_one_or_none()
+
+            if not original_query:
+                failed_ids[query_id] = "Query not found or access denied"
+                continue
+
+            # Create new query with same parameters
+            new_query = QueryModel(
+                user_id=current_user.id,
+                query_text=original_query.query_text,
+                db_username=original_query.db_username,
+                db_password=original_query.db_password,
+                db_tns=original_query.db_tns,
+                export_location=original_query.export_location,
+                export_type=original_query.export_type,
+                export_filename=original_query.export_filename,  # Preserve custom filename
+                ssh_hostname=original_query.ssh_hostname,
+                status=QueryStatus.pending.value
+            )
+
+            db.add(new_query)
             await db.commit()
-        
-        total_queries = len(query_ids.query_ids)
-        success_count = len(successful_ids)
-        fail_count = len(failed_ids)
-        
-        return BatchOperationResponse(
-            message=f"Rerun operation completed. Successfully rerun {success_count} out of {total_queries} queries.",
-            successful_ids=successful_ids,
-            failed_ids=failed_ids if failed_ids else None
-        )
-            
-    except Exception as e:
-        await db.rollback()
-        logger.error(f"Error in batch rerun operation: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to rerun queries: {str(e)}"
-        )
+            await db.refresh(new_query)
+            successful_ids.append(query_id)
+
+        except Exception as e:
+            logger.error(f"Error rerunning query {query_id}: {str(e)}")
+            failed_ids[query_id] = str(e)
+
+    return {
+        "message": f"Processed {len(batch_data.query_ids)} queries",
+        "successful_ids": successful_ids,
+        "failed_ids": failed_ids
+    }
 
 @router.post("/batch/delete")
 async def batch_delete_queries(
@@ -220,7 +227,7 @@ async def get_query_status(
         error_message=query.error_message
     )
 
-@router.post("/{query_id}/rerun", response_model=Query)
+@router.post("/{query_id}/rerun", response_model=QuerySchema)
 async def rerun_query(
     query_id: int,
     current_user: UserModel = Depends(get_current_user),

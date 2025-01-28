@@ -7,6 +7,7 @@ import asyncssh
 from app.core.config import settings
 from typing import Optional
 from app.db.models import UserSettings, Query, QueryStatus  # Import QueryStatus
+from datetime import datetime
 
 # Configure logger with console handler
 logger = logging.getLogger(__name__)
@@ -247,8 +248,25 @@ class FileTransferService:
                 remote_dir = settings.DEFAULT_EXPORT_LOCATION.strip().replace('\\', '/').rstrip('/')
                 logger.info(f"Using default export location: {remote_dir}")
             
-            # Clean up the filename and ensure it uses forward slashes
-            filename = os.path.basename(remote_path).replace('\\', '/')
+            # Determine the filename:
+            # 1. Use query's export_filename if provided
+            # 2. Otherwise use {query_id}_query_{timestamp} format
+            if query.export_filename:
+                # Add file extension if not present in custom filename
+                if query.export_type and not query.export_filename.endswith(f".{query.export_type}"):
+                    filename = f"{query.export_filename}.{query.export_type}"
+                else:
+                    filename = query.export_filename
+                logger.info(f"Using custom filename from query: {filename}")
+            else:
+                # Generate default filename with timestamp
+                timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+                filename = f"{query.id}_query_{timestamp}"
+                if query.export_type:
+                    filename = f"{filename}.{query.export_type}"
+                logger.info(f"Using default filename format: {filename}")
+            
+            # Construct final remote path
             remote_path = f"{remote_dir}/{filename}"
             logger.info(f"Final remote path: {remote_path}")
             

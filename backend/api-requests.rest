@@ -57,10 +57,7 @@ Content-Type: application/json
     "db_username": "t088503",
     "db_password": "hilaL250202",
     "db_tns": "localhost:1521/XE",
-    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 850",
-    "ssh_hostname": "localhost",
-    "export_location": "/home/testuser/query_deneme",
-    "export_type": "feather"
+    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 850"
 }
 
 ### Get Query Stats

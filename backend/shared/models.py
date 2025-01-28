@@ -71,6 +71,7 @@ class Query(Base):
     result_metadata: Mapped[Optional[dict]] = Column(JSON)
     export_location: Mapped[Optional[str]] = Column(String)
     export_type: Mapped[Optional[str]] = Column(String)
+    export_filename: Mapped[Optional[str]] = Column(String)  # Optional custom filename for exported file
     ssh_hostname: Mapped[Optional[str]] = Column(String)  # Optional SSH hostname for remote execution
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[Optional[datetime]] = Column(DateTime(timezone=True), onupdate=func.now())
