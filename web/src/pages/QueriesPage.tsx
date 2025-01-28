@@ -48,6 +48,7 @@ import {
   FilterList as FilterIcon,
   Delete as DeleteIcon,
   PlayArrow as RunIcon,
+  Upload as TransferringIcon,
 } from '@mui/icons-material';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
@@ -101,6 +102,12 @@ interface FilterConfig {
   searchText: string;
 }
 
+interface BatchOperationResponse {
+  message: string;
+  successful_ids: number[];
+  failed_ids?: Record<number, string>;
+}
+
 const initialNewQuery: NewQuery = {
   db_username: '',
   db_password: '',
@@ -120,6 +127,8 @@ const getStatusIcon = (status: string) => {
       return <PendingIcon fontSize="small" />;
     case 'queued':
       return <QueuedIcon fontSize="small" />;
+    case 'transferring':
+      return <TransferringIcon fontSize="small" />;
     default:
       return <QueuedIcon fontSize="small" />;
   }
@@ -137,6 +146,8 @@ const getStatusText = (status: string) => {
       return 'Query is pending execution';
     case 'queued':
       return 'Query is queued for execution';
+    case 'transferring':
+      return 'Transferring results to destination';
     default:
       return status;
   }
@@ -307,6 +318,8 @@ export default function QueriesPage() {
       case 'pending':
       case 'queued':
         return 'warning';
+      case 'transferring':
+        return 'info';
       default:
         return 'default';
     }
@@ -478,26 +491,35 @@ export default function QueriesPage() {
     logger.info('Rerunning selected queries', { queryIds: selectedQueries });
     
     try {
-      await Promise.all(
-        selectedQueries.map(queryId =>
-          axios.post(
-            `http://localhost:8000/api/queries/${queryId}/rerun`,
-            {},
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem('token')}`,
-              },
-            }
-          )
-        )
+      const response = await axios.post<BatchOperationResponse>(
+        'http://localhost:8000/api/queries/batch/rerun',
+        {
+          query_ids: selectedQueries
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+        }
       );
       
-      logger.info('Successfully rerun queries');
+      logger.info('Successfully rerun queries', response.data);
+      
+      // Show success/failure information
+      if (response.data.failed_ids && Object.keys(response.data.failed_ids).length > 0) {
+        const failedIds = Object.entries(response.data.failed_ids)
+          .map(([id, reason]) => `ID ${id} (${reason})`)
+          .join(', ');
+        setError(`Some queries failed to rerun: ${failedIds}`);
+      }
+      
       await refetch();
       setSelectedQueries([]);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to rerun queries', error);
-      setError('Failed to rerun selected queries');
+      const errorMessage = error.response?.data?.detail || 'Failed to rerun selected queries';
+      setError(errorMessage);
     }
   };
 
@@ -506,25 +528,26 @@ export default function QueriesPage() {
     logger.info('Deleting selected queries', { queryIds: selectedQueries });
     
     try {
-      await Promise.all(
-        selectedQueries.map(queryId =>
-          axios.delete(
-            `http://localhost:8000/api/queries/${queryId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem('token')}`,
-              },
-            }
-          )
-        )
+      const response = await axios.post(
+        'http://localhost:8000/api/queries/batch/delete',
+        {
+          query_ids: selectedQueries
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+        }
       );
       
-      logger.info('Successfully deleted queries');
+      logger.info('Successfully deleted queries', response.data);
       await refetch();
       setSelectedQueries([]);
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Failed to delete queries', error);
-      setError('Failed to delete selected queries');
+      const errorMessage = error.response?.data?.detail || 'Failed to delete selected queries';
+      setError(errorMessage);
     }
   };
 
@@ -696,7 +719,7 @@ export default function QueriesPage() {
                   </Box>
                 )}
               >
-                {['completed', 'failed', 'running', 'pending', 'queued'].map((status) => (
+                {['completed', 'failed', 'running', 'pending', 'queued', 'transferring'].map((status) => (
                   <MenuItem key={status} value={status}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {getStatusIcon(status)}
@@ -900,7 +923,7 @@ export default function QueriesPage() {
                           size="small"
                           sx={{ minWidth: 100 }}
                         />
-                        {['PENDING', 'QUEUED', 'RUNNING'].includes(query.status.toUpperCase()) && (
+                        {['PENDING', 'QUEUED', 'RUNNING', 'TRANSFERRING'].includes(query.status.toUpperCase()) && (
                           <CircularProgress size={16} />
                         )}
                       </Box>

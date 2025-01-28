@@ -1,15 +1,8 @@
-import os
-import sys
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-
-# Add the parent directory to Python path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'api-service'))
-
-from app.db.base import Base
-from app.core.config import settings
+from app.db.models import Base
 
 config = context.config
 
@@ -17,9 +10,6 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
-
-# Set the database URL in Alembic config
-config.set_main_option("sqlalchemy.url", settings.get_database_url)
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
@@ -35,8 +25,6 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.get_database_url
-    
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
@@ -45,8 +33,7 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection,
-            target_metadata=target_metadata
+            connection=connection, target_metadata=target_metadata
         )
 
         with context.begin_transaction():

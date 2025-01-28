@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
-from app.core.auth import get_current_user
+from app.api.api_v1.endpoints.auth import get_current_user
 from app.schemas.user import User, UserSettings, SSHSettingsUpdate
-from app.services.file_transfer import FileTransferService
 from app.crud.user import update_user_settings, get_user_settings
-from typing import List
 import logging
 
 router = APIRouter()
@@ -60,30 +58,4 @@ async def update_user_settings_endpoint(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Failed to update settings: {str(e)}"
-        )
-
-
-@router.post("/settings/ssh/test", status_code=status.HTTP_200_OK)
-async def test_ssh_connection(
-    settings: SSHSettingsUpdate,
-    current_user: User = Depends(get_current_user)
-):
-    """Test SSH connection with provided settings"""
-    try:
-        test_settings = UserSettings(
-            ssh_username=settings.ssh_username,
-            ssh_password=settings.ssh_password,
-            ssh_key=settings.ssh_key,
-            ssh_key_passphrase=settings.ssh_key_passphrase
-        )
-        transfer_service = FileTransferService(test_settings)
-        async with await transfer_service.get_ssh_connection() as conn:
-            # List files to test connection
-            result = await transfer_service.list_remote_files()
-            return {"message": "SSH connection successful", "files": result}
-    except Exception as e:
-        logger.error(f"SSH connection test failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"SSH connection test failed: {str(e)}"
         ) 

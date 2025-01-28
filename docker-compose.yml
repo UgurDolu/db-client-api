@@ -1,58 +1,50 @@
 version: '3.8'
 
 services:
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: db_client_api
-    environment:
-      - POSTGRES_SERVER=postgres
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - POSTGRES_DB=${POSTGRES_DB:-db_client}
-      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
-      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
-      - DEFAULT_MAX_PARALLEL_QUERIES=${DEFAULT_MAX_PARALLEL_QUERIES:-3}
-      - DEFAULT_QUEUE_TIMEOUT=${DEFAULT_QUEUE_TIMEOUT:-3600}
-      - DEFAULT_EXPORT_TYPE=${DEFAULT_EXPORT_TYPE:-csv}
-      - DEFAULT_EXPORT_LOCATION=/app/exports
-    volumes:
-      - ./exports:/app/exports
-    ports:
-      - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - db_client_network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  postgres:
+  db:
     image: postgres:15
-    container_name: db_client_postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: db_client
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=db_client
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init:/docker-entrypoint-initdb.d
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-db_client}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-    networks:
-      - db_client_network
+
+  api:
+    build:
+      context: ./backend/api-service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=db_client
+    depends_on:
+      - db
+
+  processor:
+    build:
+      context: ./backend/processor-service
+      dockerfile: Dockerfile
+    environment:
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=db_client
+      - QUERY_LISTENER_CHECK_INTERVAL=60
+      - QUERY_LISTENER_LOG_LEVEL=INFO
+      - DEFAULT_EXPORT_LOCATION=/app/exports
+      - TMP_EXPORT_LOCATION=/app/tmp/exports
+    volumes:
+      - ./exports:/app/exports
+      - ./tmp:/app/tmp
+    depends_on:
+      - db
+      - api
 
   oracle:
     image: container-registry.oracle.com/database/express:21.3.0-xe

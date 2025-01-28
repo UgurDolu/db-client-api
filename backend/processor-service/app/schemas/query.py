@@ -32,7 +32,7 @@ class Query(QueryBase):
     class Config:
         from_attributes = True
 
-class QueryStatus(BaseModel):
+class QueryStatusResponse(BaseModel):
     query_id: int
     status: QueryStatus
     position: Optional[int] = None
@@ -45,4 +45,19 @@ class QueryResult(BaseModel):
     export_location: Optional[str] = None
     export_type: Optional[str] = None
     result_metadata: Optional[Dict[str, Any]] = None
-    error_message: Optional[str] = None 
+    error_message: Optional[str] = None
+
+class QueryBatchDelete(BaseModel):
+    query_ids: list[int]
+
+class QueryBatchRerun(BaseModel):
+    query_ids: list[int]
+
+class BatchOperationResponse(BaseModel):
+    message: str
+    successful_ids: list[int]
+    failed_ids: Optional[Dict[int, str]] = None
+
+class QueryStats(BaseModel):
+    running_queries: int
+    queued_queries: int 

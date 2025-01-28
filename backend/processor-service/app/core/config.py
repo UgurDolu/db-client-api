@@ -9,7 +9,7 @@ import sys
 class Settings(BaseSettings):
     # API Settings
     API_V1_STR: str = "/api"
-    PROJECT_NAME: str = "DB Client API"
+    PROJECT_NAME: str = "DB Client Processor Service"
     
     # Security
     SECRET_KEY: str = secrets.token_urlsafe(32)
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "db_client"
-    SQLALCHEMY_DATABASE_URI: Optional[str] = None
+    _SQLALCHEMY_DATABASE_URI: Optional[str] = None
 
     # Queue Settings
     DEFAULT_MAX_PARALLEL_QUERIES: int = 3
@@ -57,10 +57,9 @@ class Settings(BaseSettings):
             return int(clean_value)
         return value
 
-    @property
-    def get_database_url(self) -> str:
-        if self.SQLALCHEMY_DATABASE_URI:
-            return self.SQLALCHEMY_DATABASE_URI
+    def get_database_uri(self) -> str:
+        if self._SQLALCHEMY_DATABASE_URI:
+            return self._SQLALCHEMY_DATABASE_URI
         return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_SERVER}/{self.POSTGRES_DB}"
 
     class Config:
