@@ -17,7 +17,7 @@ import {
   Snackbar,
   IconButton,
 } from '@mui/material';
-import { Save as SaveIcon, VpnKey as VpnKeyIcon } from '@mui/icons-material';
+import { Save as SaveIcon } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { logger } from '../services/logger';
 import { SelectChangeEvent } from '@mui/material';
@@ -51,7 +51,6 @@ export default function UserSettingsPage() {
   const [settings, setSettings] = useState<UserSettings>(initialSettings);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isTestingSSH, setIsTestingSSH] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const { logout } = useAuth();
@@ -89,29 +88,6 @@ export default function UserSettingsPage() {
       setError('Failed to save settings');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleTestSSH = async () => {
-    setIsTestingSSH(true);
-    setError('');
-    try {
-      const sshSettings = {
-        ssh_hostname: settings.ssh_hostname,
-        ssh_port: settings.ssh_port,
-        ssh_username: settings.ssh_username,
-        ssh_password: settings.ssh_password,
-        ssh_key: settings.ssh_key,
-        ssh_key_passphrase: settings.ssh_key_passphrase,
-      };
-      const response = await userApi.testSSHConnection(sshSettings);
-      setSuccessMessage('SSH connection test successful');
-      logger.info('SSH connection test successful', response);
-    } catch (error) {
-      logger.error('SSH connection test failed', error);
-      setError('SSH connection test failed');
-    } finally {
-      setIsTestingSSH(false);
     }
   };
 
@@ -276,15 +252,7 @@ export default function UserSettingsPage() {
                     onChange={handleTextChange('ssh_key_passphrase')}
                   />
 
-                  <Box sx={{ display: 'flex', gap: 2 }}>
-                    <Button
-                      variant="outlined"
-                      startIcon={<VpnKeyIcon />}
-                      onClick={handleTestSSH}
-                      disabled={isTestingSSH}
-                    >
-                      {isTestingSSH ? 'Testing Connection...' : 'Test SSH Connection'}
-                    </Button>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
                       variant="contained"
                       startIcon={<SaveIcon />}

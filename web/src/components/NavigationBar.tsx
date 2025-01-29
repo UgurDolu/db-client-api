@@ -28,7 +28,13 @@ export default function NavigationBar() {
   };
 
   return (
-    <AppBar position="fixed">
+    <AppBar 
+      position="fixed"
+      sx={{ 
+        bgcolor: '#003087',
+        backgroundImage: 'none' // This removes any default gradient
+      }}
+    >
       <Toolbar>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexGrow: 1 }}>
           <Typography

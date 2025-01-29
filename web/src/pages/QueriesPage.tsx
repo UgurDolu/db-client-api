@@ -695,7 +695,12 @@ export default function QueriesPage() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Button
               variant="contained"
-              color="primary"
+              sx={{ 
+                bgcolor: '#003087',
+                '&:hover': {
+                  bgcolor: '#002670'  // Slightly darker shade for hover
+                }
+              }}
               startIcon={<AddIcon />}
               onClick={() => setIsCreateModalOpen(true)}
             >
@@ -813,7 +818,15 @@ export default function QueriesPage() {
                           Created
                         </TableSortLabel>
                       </TableCell>
-                      <TableCell>Results</TableCell>
+                      <TableCell>
+                        <TableSortLabel
+                          active={sort.field === 'completed_at'}
+                          direction={sort.direction}
+                          onClick={() => handleSort('completed_at')}
+                        >
+                          Completed At
+                        </TableSortLabel>
+                      </TableCell>
                     </>
                   )}
                   <TableCell align="right">Actions</TableCell>
@@ -896,35 +909,26 @@ export default function QueriesPage() {
                         <>
                           <TableCell>{formatDateTime(query.created_at)}</TableCell>
                           <TableCell>
-                            {query.status === 'COMPLETED' && query.result_metadata?.file_path && (
-                              <Button
-                                variant="text"
-                                size="small"
-                                startIcon={<DownloadIcon />}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDownload(query);
-                                }}
-                              >
-                                Download
-                              </Button>
-                            )}
-                            {query.status === 'FAILED' && (
-                              <Tooltip title={query.error_message}>
-                                <Typography 
-                                  color="error" 
-                                  variant="caption"
-                                  sx={{ 
-                                    cursor: 'help',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 0.5,
-                                  }}
-                                >
-                                  <ErrorIcon fontSize="small" />
-                                  Error
-                                </Typography>
-                              </Tooltip>
+                            {query.completed_at ? (
+                              formatDateTime(query.completed_at)
+                            ) : (
+                              query.status === 'FAILED' && (
+                                <Tooltip title={query.error_message}>
+                                  <Typography 
+                                    color="error" 
+                                    variant="caption"
+                                    sx={{ 
+                                      cursor: 'help',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: 0.5,
+                                    }}
+                                  >
+                                    <ErrorIcon fontSize="small" />
+                                    Error
+                                  </Typography>
+                                </Tooltip>
+                              )
                             )}
                           </TableCell>
                         </>
