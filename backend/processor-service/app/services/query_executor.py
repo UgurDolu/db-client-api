@@ -80,7 +80,7 @@ class QueryExecutor:
                             started_any = False
                             
                             # Try to start one query for each user that has pending queries
-                            for user_id, user_queries in user_pending_queries.items():
+                            for user_id, user_queries in list(user_pending_queries.items()):
                                 if not user_queries:  # Skip if user has no more pending queries
                                     continue
                                 
@@ -89,55 +89,38 @@ class QueryExecutor:
 
                                 # Check if we can start a query for this user
                                 if current_user_queries < user_limit:
-                                    query, _ = user_queries[0]
+                                    query, _ = user_queries.pop(0)  # Remove the query from pending list
                                     if query.id not in self.active_queries:
                                         # Start processing the query
                                         task = asyncio.create_task(self.execute_query(query))
+                                        
+                                        # Add cleanup callback
+                                        def cleanup_callback(task, query_id=query.id, user_id=user_id):
+                                            self.active_queries.pop(query_id, None)
+                                            self.user_active_queries[user_id].discard(query_id)
+                                            if not self.user_active_queries[user_id]:
+                                                self.user_active_queries.pop(user_id, None)
+                                        
+                                        task.add_done_callback(cleanup_callback)
+                                        
                                         self.active_queries[query.id] = task
                                         self.user_active_queries[user_id].add(query.id)
                                         started_count += 1
                                         started_any = True
                                         
-                                        # Remove the started query from pending list
-                                        user_queries.pop(0)
-                                        
-                                        logger.info(f"Started query {query.id} for user {user_id} "
-                                                  f"(User running: {current_user_queries + 1}/{user_limit}, "
-                                                  f"Total running: {total_running + started_count}/{self.max_total_queries})")
-
+                                        # Break if we've used all available slots
                                         if started_count >= available_slots:
                                             break
-
-                            # If we couldn't start any new queries in this round, break
+                            
+                            # If we couldn't start any queries in this round, break
                             if not started_any:
                                 break
 
-                    # Clean up completed tasks
-                    completed = []
-                    for query_id, task in self.active_queries.items():
-                        if task.done():
-                            try:
-                                # Check if the task raised any exception
-                                await task
-                            except Exception as e:
-                                logger.error(f"Query {query_id} failed with error: {str(e)}")
-                            completed.append(query_id)
-                    
-                    for query_id in completed:
-                        # Find and remove the query from user's active queries
-                        for user_id, queries in self.user_active_queries.items():
-                            if query_id in queries:
-                                queries.remove(query_id)
-                                if not queries:  # If user has no more active queries
-                                    del self.user_active_queries[user_id]
-                                break
-                        del self.active_queries[query_id]
-
             except Exception as e:
-                logger.error(f"Error in query processing loop: {str(e)}", exc_info=True)
-
-            # Wait before checking for new queries
-            await asyncio.sleep(self.check_interval)  # Use the instance variable instead
+                logger.error(f"Error in process_queries: {str(e)}", exc_info=True)
+            
+            # Use a short sleep to prevent CPU spinning
+            await asyncio.sleep(self.check_interval)
 
     async def execute_query(self, query: Query) -> bool:
         """Execute a single query"""
@@ -168,13 +151,6 @@ class QueryExecutor:
                 else:
                     logger.info(f"Using default export location: {settings.DEFAULT_EXPORT_LOCATION}")
 
-                # Connect to Oracle
-                oracle_conn = oracledb.connect(
-                    user=query.db_username,
-                    password=query.db_password,
-                    dsn=query.db_tns
-                )
-
                 # Update status to running and set started_at timestamp
                 await self._update_query_status(
                     query.id,
@@ -182,74 +158,84 @@ class QueryExecutor:
                     started_at=datetime.now(timezone.utc)
                 )
 
-                # Execute query and process results
-                cursor = oracle_conn.cursor()
-                try:
+                # Run database operations in a thread pool to avoid blocking
+                def execute_oracle_query():
+                    conn = oracledb.connect(
+                        user=query.db_username,
+                        password=query.db_password,
+                        dsn=query.db_tns
+                    )
+                    cursor = conn.cursor()
                     cursor.execute(query.query_text)
                     columns = [col[0] for col in cursor.description]
                     rows = cursor.fetchall()
-                    df = pd.DataFrame(rows, columns=columns)
+                    cursor.close()
+                    conn.close()
+                    return columns, rows
 
-                    # Save and transfer results
-                    tmp_file_path, result_metadata = await self._save_results(df, query, user_settings)
-                    
-                    # Calculate final file path based on user settings or query-specific path
-                    final_path = (
-                        query.export_location or 
-                        (user_settings.export_location if user_settings else None) or 
-                        settings.DEFAULT_EXPORT_LOCATION
-                    )
-                    # Get export type from query or user settings
-                    export_type = query.export_type or (user_settings.export_type if user_settings else None) or 'csv'
-                    logger.info(f"Using export type: {export_type}")
-                    if export_type == 'excel':
-                        export_type = 'xlsx'
-                    # Generate filename based on query settings or default format
-                    if query.export_filename:
-                        # Use custom filename from query
-                        base_filename = query.export_filename
-                        if export_type and not base_filename.endswith(f".{export_type}"):
-                            filename = f"{base_filename}.{export_type}"
-                        else:
-                            filename = base_filename
-                        logger.info(f"Using custom filename: {filename}")
-                    else:
-                        # Generate default filename with timestamp
-                        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-                        filename = f"{query.id}_query_{timestamp}.{export_type}"
-                        logger.info(f"Using default filename format: {filename}")
-
-                    final_file_path = os.path.join(final_path, filename).replace("\\", "/")
-                    result_metadata["final_file_path"] = final_file_path
-                    logger.info(f"Final file path: {final_file_path}")
-                    
-                    # Update status to transferring
-                    await self._update_query_status(
-                        query.id,
-                        QueryStatus.transferring.value,
-                        result_metadata=result_metadata
-                    )
-
-                    # Create transfer service with user settings
-                    transfer_service = FileTransferService(user_settings)
-                    
-                    success = await transfer_service.transfer_file(
-                        str(tmp_file_path),
-                        final_file_path,
-                        str(query.user_id),
-                        query
-                    )
-
-                    if success:
-                        await self._update_query_status(query.id, QueryStatus.completed.value)
-                        return True
-                    else:
-                        raise Exception("File transfer failed")
-
-                finally:
-                    if cursor:
-                        cursor.close()
+                # Execute in thread pool
+                loop = asyncio.get_event_loop()
+                columns, rows = await loop.run_in_executor(None, execute_oracle_query)
                 
+                # Create DataFrame
+                df = pd.DataFrame(rows, columns=columns)
+
+                # Save and transfer results
+                tmp_file_path, result_metadata = await self._save_results(df, query, user_settings)
+                
+                # Calculate final file path based on user settings or query-specific path
+                final_path = (
+                    query.export_location or 
+                    (user_settings.export_location if user_settings else None) or 
+                    settings.DEFAULT_EXPORT_LOCATION
+                )
+                # Get export type from query or user settings
+                export_type = query.export_type or (user_settings.export_type if user_settings else None) or 'csv'
+                logger.info(f"Using export type: {export_type}")
+                if export_type == 'excel':
+                    export_type = 'xlsx'
+                # Generate filename based on query settings or default format
+                if query.export_filename:
+                    # Use custom filename from query
+                    base_filename = query.export_filename
+                    if export_type and not base_filename.endswith(f".{export_type}"):
+                        filename = f"{base_filename}.{export_type}"
+                    else:
+                        filename = base_filename
+                    logger.info(f"Using custom filename: {filename}")
+                else:
+                    # Generate default filename with timestamp
+                    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+                    filename = f"{query.id}_query_{timestamp}.{export_type}"
+                    logger.info(f"Using default filename format: {filename}")
+
+                final_file_path = os.path.join(final_path, filename).replace("\\", "/")
+                result_metadata["final_file_path"] = final_file_path
+                logger.info(f"Final file path: {final_file_path}")
+                
+                # Update status to transferring
+                await self._update_query_status(
+                    query.id,
+                    QueryStatus.transferring.value,
+                    result_metadata=result_metadata
+                )
+
+                # Create transfer service with user settings
+                transfer_service = FileTransferService(user_settings)
+                
+                success = await transfer_service.transfer_file(
+                    str(tmp_file_path),
+                    final_file_path,
+                    str(query.user_id),
+                    query
+                )
+
+                if success:
+                    await self._update_query_status(query.id, QueryStatus.completed.value)
+                    return True
+                else:
+                    raise Exception("File transfer failed")
+
         except Exception as e:
             logger.error(f"Error executing query {query.id}: {str(e)}", exc_info=True)
             await self._update_query_status(
@@ -258,13 +244,6 @@ class QueryExecutor:
                 error_message=str(e)
             )
             return False
-            
-        finally:
-            if oracle_conn:
-                try:
-                    oracle_conn.close()
-                except:
-                    pass
 
     async def _update_query_status(
         self,
@@ -327,18 +306,28 @@ class QueryExecutor:
             filename = f"query_{query.id}_{timestamp}.{extension}"
             filepath = temp_dir / filename
             
-            # Save based on export type
-            if query.export_type == 'csv' or not query.export_type:
-                df.to_csv(filepath, index=False)
-            elif query.export_type == 'excel':
-                    df.to_excel(filepath, index=False, engine='openpyxl')
-            elif query.export_type == 'json':
-                df.to_json(filepath, orient='records')
-            elif query.export_type == 'feather':
-                df.to_feather(filepath)
+            # Run file I/O operations in thread pool
+            loop = asyncio.get_event_loop()
             
-            # Calculate file size
-            file_size = os.path.getsize(filepath)
+            async def save_dataframe():
+                def _save():
+                    # Save based on export type
+                    if query.export_type == 'csv' or not query.export_type:
+                        df.to_csv(filepath, index=False)
+                    elif query.export_type == 'excel':
+                        df.to_excel(filepath, index=False, engine='openpyxl')
+                    elif query.export_type == 'json':
+                        df.to_json(filepath, orient='records')
+                    elif query.export_type == 'feather':
+                        df.to_feather(filepath)
+                    
+                    # Calculate file size
+                    return os.path.getsize(filepath)
+                
+                return await loop.run_in_executor(None, _save)
+            
+            # Execute file saving in thread pool
+            file_size = await save_dataframe()
             
             # Prepare metadata
             metadata = {
