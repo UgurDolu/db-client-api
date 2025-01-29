@@ -5,9 +5,13 @@ import shutil
 from pathlib import Path
 import asyncssh
 from app.core.config import settings
-from typing import Optional
+from typing import Optional, List
 from app.db.models import UserSettings, Query, QueryStatus  # Import QueryStatus
 from datetime import datetime
+import aiofiles
+import io
+import math
+from concurrent.futures import ThreadPoolExecutor
 
 # Configure logger with console handler
 logger = logging.getLogger(__name__)
@@ -35,6 +39,9 @@ class FileTransferService:
         self.ensure_directory(self.tmp_dir)
         self.max_retries = 3
         self.retry_delay = 2  # seconds
+        self.chunk_size = 100 * 1024 * 1024  # 8MB chunks
+        self.max_concurrent_chunks = 10
+        self.executor = ThreadPoolExecutor(max_workers=4)
         
         # Log initialization details
         if user_settings and user_settings.ssh_username:
@@ -212,85 +219,119 @@ class FileTransferService:
             logger.error(f"Error cleaning up temporary directory {self.tmp_dir}: {str(e)}", exc_info=True)
             raise
 
-    async def transfer_file(self, local_path: str, remote_path: str, user_id: str, query: Query) -> bool:
-        """Transfer a file from temporary storage to user's export location via SCP with retries.
-        
-        Args:
-            local_path: Path to the local file to transfer
-            remote_path: Destination path on the remote server
-            user_id: ID of the user performing the transfer
-            query: Query object containing status and error information
-        """
+    async def _transfer_chunk(self, ssh, local_path: str, remote_path: str, 
+                            start: int, end: int, compress: bool = True) -> None:
+        """Transfer a chunk of the file using specified byte range."""
         try:
-            # Ensure local directory exists and file is readable
+            async with aiofiles.open(local_path, 'rb') as f:
+                await f.seek(start)
+                chunk = await f.read(end - start)
+                
+                if compress:
+                    # Create SFTP client for this connection
+                    async with ssh.start_sftp_client() as sftp:
+                        # Write directly using SFTP with compression
+                        async with sftp.open(f"{remote_path}.{start}", "wb") as remote_file:
+                            await remote_file.write(chunk)
+                else:
+                    # Create a temporary file for the chunk
+                    chunk_name = f"{os.path.basename(remote_path)}.part{start}"
+                    temp_path = os.path.join(self.tmp_dir, chunk_name)
+                    
+                    async with aiofiles.open(temp_path, 'wb') as temp_f:
+                        await temp_f.write(chunk)
+                    
+                    # Transfer using SCP
+                    await asyncssh.scp(temp_path, (ssh, f"{remote_path}.{start}"))
+                    # Clean up temporary chunk file
+                    os.unlink(temp_path)
+                
+                logger.debug(f"Transferred chunk {start}-{end} of {remote_path}")
+        except Exception as e:
+            logger.error(f"Error transferring chunk {start}-{end}: {str(e)}")
+            raise
+
+    async def _assemble_chunks(self, ssh, remote_path: str, chunk_starts: List[int]) -> None:
+        """Assemble the chunks on the remote server."""
+        try:
+            # Sort chunk starts to ensure correct order
+            chunk_starts.sort()
+            
+            # First create empty target file
+            await ssh.run(f'touch "{remote_path}"')
+            
+            # Concatenate all chunks sequentially
+            for start in chunk_starts:
+                chunk_path = f"{remote_path}.{start}"
+                concat_cmd = f'cat "{chunk_path}" >> "{remote_path}"'
+                result = await ssh.run(concat_cmd)
+                if result.exit_status != 0:
+                    raise Exception(f"Failed to concatenate chunk {chunk_path}: {result.stderr}")
+            
+            # Clean up chunk files one by one to avoid command line length issues
+            for start in chunk_starts:
+                chunk_path = f"{remote_path}.{start}"
+                await ssh.run(f'rm -f "{chunk_path}"')
+            
+            logger.info(f"Successfully assembled chunks for {remote_path}")
+        except Exception as e:
+            logger.error(f"Error assembling chunks: {str(e)}")
+            raise
+
+    async def transfer_file(self, local_path: str, remote_path: str, user_id: str, query: Query) -> bool:
+        """Transfer a file using parallel chunks with compression."""
+        try:
             local_path = os.path.abspath(local_path)
             if not os.path.exists(local_path):
                 error_msg = f"Local file not found: {local_path}"
                 query.status = QueryStatus.failed.value
                 query.error_message = error_msg
                 raise FileNotFoundError(error_msg)
+
+            file_size = os.path.getsize(local_path)
+            num_chunks = math.ceil(file_size / self.chunk_size)
+            chunk_starts = [i * self.chunk_size for i in range(num_chunks)]
             
-            # Convert paths to use forward slashes and normalize
-            local_path = local_path.replace('\\', '/')
-            remote_path = remote_path.replace('\\', '/')
-            logger.info(f"Final remote path: {remote_path}")
-            # Extract remote directory by splitting the remote path
-            remote_dir = os.path.dirname(remote_path)
-            logger.info(f"Remote directory path: {remote_dir}")
-            retries = 0
-            last_error = None
+            logger.info(f"Starting parallel transfer of {local_path} ({file_size} bytes) in {num_chunks} chunks")
             
-            while retries < self.max_retries:
-                try:
-                    async with await self.get_ssh_connection(query) as ssh:
-                        # First, ensure remote directory exists
-                        mkdir_cmd = f'mkdir -p "{remote_dir}"'
-                        result = await ssh.run(mkdir_cmd)
-                        if result.exit_status != 0:
-                            raise Exception(f"Failed to create remote directory: {result.stderr}")
-                        
-                        # Transfer the file using SCP
-                        logger.info(f"Starting SCP transfer: {local_path} -> {remote_path}")
-                        await asyncssh.scp(local_path, (ssh, remote_path))
-                        
-                        # Verify the file exists and set permissions
-                        verify_cmd = f'ls -l "{remote_path}"'
-                        result = await ssh.run(verify_cmd)
-                        if result.exit_status == 0:
-                            await ssh.run(f'chmod 644 "{remote_path}"')
-                            return True
-                        else:
-                            raise Exception(f"File transfer verification failed: {result.stderr}")
-                            
-                except Exception as ssh_error:
-                    last_error = str(ssh_error)
-                    logger.error(f"SSH transfer attempt {retries + 1} failed: {last_error}")
-                    if retries + 1 < self.max_retries:
-                        retries += 1
-                        await asyncio.sleep(self.retry_delay)
-                        continue
-                    else:
-                        # Update query status and error message
-                        query.status = QueryStatus.failed.value
-                        query.error_message = f"SSH transfer failed after {self.max_retries} attempts: {last_error}"
-                        raise Exception(query.error_message)
-            
-            return False
-            
+            async with await self.get_ssh_connection(query) as ssh:
+                # Ensure remote directory exists and clean up any existing file
+                remote_dir = os.path.dirname(remote_path)
+                await ssh.run(f'mkdir -p "{remote_dir}"; rm -f "{remote_path}"')
+                
+                # Transfer chunks in parallel
+                tasks = []
+                for i in range(0, len(chunk_starts), self.max_concurrent_chunks):
+                    chunk_group = chunk_starts[i:i + self.max_concurrent_chunks]
+                    group_tasks = []
+                    
+                    for start in chunk_group:
+                        end = min(start + self.chunk_size, file_size)
+                        task = self._transfer_chunk(ssh, local_path, remote_path, start, end)
+                        group_tasks.append(task)
+                    
+                    # Wait for current group to complete before starting next group
+                    await asyncio.gather(*group_tasks)
+                    tasks.extend(group_tasks)
+                
+                # Assemble chunks on remote server
+                await self._assemble_chunks(ssh, remote_path, chunk_starts)
+                
+                # Verify file size
+                result = await ssh.run(f'stat -f %z "{remote_path}" || stat --format="%s" "{remote_path}"')
+                if result.exit_status == 0:
+                    remote_size = int(result.stdout.strip())
+                    if remote_size != file_size:
+                        raise Exception(f"File size mismatch: local={file_size}, remote={remote_size}")
+                
+                logger.info(f"Successfully transferred {local_path} to {remote_path}")
+                return True
+                
         except Exception as e:
-            # Ensure query status is updated on any error
+            logger.error(f"File transfer failed: {str(e)}")
             query.status = QueryStatus.failed.value
-            query.error_message = str(e)
+            query.error_message = f"File transfer failed: {str(e)}"
             raise
-        finally:
-            # Always clean up temporary files
-            try:
-                if os.path.exists(local_path):
-                    os.remove(local_path)
-                    logger.info(f"Cleaned up temporary file: {local_path}")
-                await self.cleanup_tmp_directory()
-            except Exception as cleanup_error:
-                logger.error(f"Error during cleanup: {str(cleanup_error)}")
 
     def cleanup_tmp_file(self, file_path: str) -> bool:
         """Remove temporary file after successful transfer."""
