@@ -11,7 +11,7 @@ from app.api.api_v1.endpoints.auth import get_current_user
 from sqlalchemy import select, update, delete, func
 from typing import List, Dict
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -38,11 +38,12 @@ async def create_query(
     """
     logger.info(f"Creating new query for user {current_user.id}")
     try:
-        # Create new query
+        # Create new query with UTC timestamp
         query = QueryModel(
             **query_in.model_dump(),
             user_id=current_user.id,
-            status=QueryStatus.pending.value
+            status=QueryStatus.pending.value,
+            created_at=datetime.now(timezone.utc)
         )
         
         db.add(query)
@@ -64,7 +65,7 @@ async def list_queries(
     current_user: UserModel = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all queries for the current user"""
+    """List all queries for the current user with complete information"""
     try:
         result = await db.execute(
             select(QueryModel)
@@ -72,7 +73,27 @@ async def list_queries(
             .order_by(QueryModel.created_at.desc())
         )
         queries = result.scalars().all()
-        return queries
+        return [
+            QuerySchema(
+                id=query.id,
+                user_id=query.user_id,
+                query_text=query.query_text,
+                db_username=query.db_username,
+                db_password=query.db_password,
+                db_tns=query.db_tns,
+                status=query.status,
+                error_message=query.error_message,
+                result_metadata=query.result_metadata,
+                export_location=query.export_location,
+                export_type=query.export_type,
+                export_filename=query.export_filename,
+                ssh_hostname=query.ssh_hostname,
+                created_at=query.created_at,
+                started_at=query.started_at,
+                updated_at=query.updated_at,
+                completed_at=query.completed_at
+            ) for query in queries
+        ]
     except Exception as e:
         logger.error(f"Error fetching queries: {str(e)}", exc_info=True)
         raise HTTPException(
@@ -223,8 +244,14 @@ async def get_query_status(
         status=query.status,
         export_location=query.export_location,
         export_type=query.export_type,
+        export_filename=query.export_filename,
+        ssh_hostname=query.ssh_hostname,
         result_metadata=query.result_metadata,
-        error_message=query.error_message
+        error_message=query.error_message,
+        created_at=query.created_at,
+        started_at=query.started_at,
+        updated_at=query.updated_at,
+        completed_at=query.completed_at
     )
 
 @router.post("/{query_id}/rerun", response_model=QuerySchema)
@@ -259,7 +286,7 @@ async def rerun_query(
             export_type=query.export_type,
             ssh_hostname=query.ssh_hostname,
             status=QueryStatus.pending.value,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(timezone.utc)
         )
         
         db.add(new_query)

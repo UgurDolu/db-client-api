@@ -2,7 +2,7 @@ import oracledb
 import pandas as pd
 import asyncio
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from app.db.models import Query, UserSettings, QueryStatus
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy import select, func
@@ -175,8 +175,12 @@ class QueryExecutor:
                     dsn=query.db_tns
                 )
 
-                # Update status to running
-                await self._update_query_status(query.id, QueryStatus.running.value)
+                # Update status to running and set started_at timestamp
+                await self._update_query_status(
+                    query.id,
+                    QueryStatus.running.value,
+                    started_at=datetime.now(timezone.utc)
+                )
 
                 # Execute query and process results
                 cursor = oracle_conn.cursor()
@@ -207,7 +211,7 @@ class QueryExecutor:
                         logger.info(f"Using custom filename: {filename}")
                     else:
                         # Generate default filename with timestamp
-                        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+                        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
                         filename = f"{query.id}_query_{timestamp}.{query.export_type or 'csv'}"
                         logger.info(f"Using default filename format: {filename}")
 
@@ -263,7 +267,8 @@ class QueryExecutor:
         query_id: int,
         status: str,
         error_message: Optional[str] = None,
-        result_metadata: Optional[Dict[str, Any]] = None
+        result_metadata: Optional[Dict[str, Any]] = None,
+        started_at: Optional[datetime] = None
     ) -> bool:
         max_retries = 3
         retry_count = 0
@@ -286,9 +291,9 @@ class QueryExecutor:
                                 query.result_metadata = existing_metadata
                         
                         if status == QueryStatus.running.value:
-                            query.started_at = datetime.utcnow()
+                            query.started_at = started_at or datetime.now(timezone.utc)
                         elif status in [QueryStatus.completed.value, QueryStatus.failed.value]:
-                            query.completed_at = datetime.utcnow()
+                            query.completed_at = datetime.now(timezone.utc)
                         
                         await session.commit()
                         logger.info(f"Status updated successfully for query {query_id} to {status}")
@@ -313,7 +318,7 @@ class QueryExecutor:
             temp_dir.mkdir(parents=True, exist_ok=True)
             
             # Generate filename with query ID and timestamp
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             extension = 'xlsx' if query.export_type == 'excel' else (query.export_type or 'csv')
             filename = f"query_{query.id}_{timestamp}.{extension}"
             filepath = temp_dir / filename

@@ -44,6 +44,7 @@ class Query(QueryBase):
     error_message: Optional[str] = None
     result_metadata: Optional[Dict[str, Any]] = None
     created_at: datetime
+    started_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
@@ -62,8 +63,14 @@ class QueryResult(BaseModel):
     status: QueryStatus
     export_location: Optional[str] = None
     export_type: Optional[str] = None
+    export_filename: Optional[str] = None
+    ssh_hostname: Optional[str] = None
     result_metadata: Optional[Dict[str, Any]] = None
     error_message: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
 
 class QueryBatchDelete(BaseModel):
     query_ids: List[int]

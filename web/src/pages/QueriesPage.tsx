@@ -60,6 +60,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { logger } from '../services/logger';
+import Editor from '@monaco-editor/react';
 
 interface Query {
   id: number;
@@ -68,11 +69,16 @@ interface Query {
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
+  updated_at: string | null;
   error_message: string | null;
   result_metadata: any;
   export_type?: string;
   export_location?: string;
-  ssh_hostname?: string;  // Optional SSH hostname for remote execution
+  export_filename?: string;
+  ssh_hostname?: string;
+  db_tns: string;
+  db_username: string;
+  db_password: string;
 }
 
 interface NewQuery {
@@ -81,8 +87,9 @@ interface NewQuery {
   db_tns: string;
   query_text: string;
   ssh_hostname?: string;  // Optional SSH hostname for remote execution
-  export_type?: string;
-  export_location?: string;
+  export_type?: string;   // Optional export type
+  export_location?: string; // Optional export location
+  export_filename?: string; // Optional export filename
 }
 
 interface QueryDetails {
@@ -92,9 +99,10 @@ interface QueryDetails {
     execution_duration: string;
   };
   metadata: {
-    rows_affected?: number;
-    file_size?: string;
-    column_count?: number;
+    rows: number;
+    columns: number;
+    file_size: number;
+    final_file_path: string;
   };
 }
 
@@ -125,7 +133,8 @@ const initialNewQuery: NewQuery = {
   query_text: '',
   ssh_hostname: '',  // Initialize empty
   export_type: '',
-  export_location: ''
+  export_location: '',
+  export_filename: '',
 };
 
 const getStatusIcon = (status: string) => {
@@ -137,7 +146,7 @@ const getStatusIcon = (status: string) => {
     case 'running':
       return <RunningIcon fontSize="small" />;
     case 'pending':
-      return <PendingIcon fontSize="small" />;
+      return <QueuedIcon fontSize="small" />;
     case 'queued':
       return <QueuedIcon fontSize="small" />;
     case 'transferring':
@@ -288,12 +297,25 @@ export default function QueriesPage() {
   const handleCreateQuery = async () => {
     setError('');
     setIsSubmitting(true);
-    logger.debug('Creating new query', { ...newQuery, db_password: '[REDACTED]' });
+    
+    // Create a new object with only the filled fields
+    const queryToSubmit = {
+      db_username: newQuery.db_username,
+      db_password: newQuery.db_password,
+      db_tns: newQuery.db_tns,
+      query_text: newQuery.query_text,
+      ...(newQuery.ssh_hostname ? { ssh_hostname: newQuery.ssh_hostname } : {}),
+      ...(newQuery.export_type ? { export_type: newQuery.export_type } : {}),
+      ...(newQuery.export_location ? { export_location: newQuery.export_location } : {}),
+      ...(newQuery.export_filename ? { export_filename: newQuery.export_filename } : {})
+    };
+
+    logger.debug('Creating new query', { ...queryToSubmit, db_password: '[REDACTED]' });
 
     try {
       await axios.post(
         'http://localhost:8000/api/queries/',
-        newQuery,
+        queryToSubmit,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -341,9 +363,19 @@ export default function QueriesPage() {
     }
   };
 
-  const formatDateTime = (dateStr: string | null) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleString();
+  const formatDateTime = (timestamp: string | null | undefined): string => {
+    if (!timestamp) return '-';
+    // Parse the UTC timestamp and format it in the user's local timezone
+    const date = new Date(timestamp);
+    return new Intl.DateTimeFormat('default', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short'
+    }).format(date);
   };
 
   const handleDownload = (query: Query) => {
@@ -456,25 +488,29 @@ export default function QueriesPage() {
       execution_duration: '-'
     };
     
+    // Total duration (from creation to completion/failure)
     if (query.completed_at && query.created_at) {
       const total = new Date(query.completed_at).getTime() - new Date(query.created_at).getTime();
       timing.total_duration = `${(total / 1000).toFixed(2)}s`;
     }
     
+    // Queue duration (from creation to start)
     if (query.started_at && query.created_at) {
       const queue = new Date(query.started_at).getTime() - new Date(query.created_at).getTime();
       timing.queue_duration = `${(queue / 1000).toFixed(2)}s`;
     }
     
+    // Execution duration (from start to completion/failure)
     if (query.completed_at && query.started_at) {
       const execution = new Date(query.completed_at).getTime() - new Date(query.started_at).getTime();
       timing.execution_duration = `${(execution / 1000).toFixed(2)}s`;
     }
 
     const metadata = {
-      rows_affected: query.result_metadata?.rows_affected || 0,
-      file_size: query.result_metadata?.file_size || '0 KB',
-      column_count: query.result_metadata?.column_count || 0
+      rows: query.result_metadata?.rows || 0,
+      columns: query.result_metadata?.columns || 0,
+      file_size: query.result_metadata?.file_size || 0,
+      final_file_path: query.result_metadata?.final_file_path || '-'
     };
 
     return { timing, metadata };
@@ -1089,13 +1125,51 @@ export default function QueriesPage() {
                 />
               </Grid>
               <Grid item xs={12}>
+                <Typography variant="subtitle2" gutterBottom>
+                  SQL Query
+                </Typography>
+                <Box 
+                  sx={{ 
+                    border: '1px solid',
+                    borderColor: 'grey.300',
+                    borderRadius: 1,
+                    '&:hover': {
+                      borderColor: 'grey.400'
+                    }
+                  }}
+                >
+                  <Editor
+                    height="200px"
+                    defaultLanguage="sql"
+                    value={newQuery.query_text}
+                    onChange={(value) => {
+                      setNewQuery(prev => ({
+                        ...prev,
+                        query_text: value || ''
+                      }));
+                    }}
+                    options={{
+                      minimap: { enabled: false },
+                      scrollBeyondLastLine: false,
+                      fontSize: 14,
+                      tabSize: 2,
+                      wordWrap: 'on',
+                      automaticLayout: true,
+                      formatOnPaste: true,
+                      formatOnType: true
+                    }}
+                  />
+                </Box>
+              </Grid>
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
-                  label="TNS Connection String"
+                  required
+                  label="Database TNS"
                   name="db_tns"
                   value={newQuery.db_tns}
                   onChange={handleInputChange}
-                  required
+                  error={Boolean(error)}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -1108,26 +1182,14 @@ export default function QueriesPage() {
                   helperText="Remote server hostname for SSH tunnel connection"
                 />
               </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Query Text"
-                  name="query_text"
-                  value={newQuery.query_text}
-                  onChange={handleInputChange}
-                  required
-                  multiline
-                  rows={4}
-                />
-              </Grid>
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth>
-                  <InputLabel>Export Type</InputLabel>
+                  <InputLabel>Export Type (Optional)</InputLabel>
                   <Select
                     name="export_type"
                     value={newQuery.export_type}
                     onChange={(e) => handleInputChange(e as any)}
-                    label="Export Type"
+                    label="Export Type (Optional)"
                   >
                     <MenuItem value="">None</MenuItem>
                     <MenuItem value="csv">CSV</MenuItem>
@@ -1140,11 +1202,21 @@ export default function QueriesPage() {
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
-                  label="Export Location"
+                  label="Export Location (Optional)"
                   name="export_location"
                   value={newQuery.export_location}
                   onChange={handleInputChange}
                   helperText="Optional path for exported files"
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  label="Export Filename (Optional)"
+                  name="export_filename"
+                  value={newQuery.export_filename}
+                  onChange={handleInputChange}
+                  helperText="Optional custom filename for the exported file"
                 />
               </Grid>
             </Grid>
@@ -1187,25 +1259,87 @@ export default function QueriesPage() {
             </DialogTitle>
             <DialogContent>
               <Grid container spacing={3}>
-                {/* Query Text Section */}
-                <Grid item xs={12}>
+                {/* SQL Query Information */}
+                <Grid item xs={12} md={6}>
                   <Card variant="outlined">
                     <CardContent>
                       <Typography variant="subtitle1" gutterBottom>
                         SQL Query
                       </Typography>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          whiteSpace: 'pre-wrap',
-                          fontFamily: 'monospace',
-                          bgcolor: 'grey.100',
-                          p: 2,
-                          borderRadius: 1
-                        }}
-                      >
-                        {selectedQuery.query_text}
-                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Database TNS:
+                          </Typography>
+                          <Tooltip title={selectedQuery.db_tns}>
+                            <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                              {selectedQuery.db_tns}
+                            </Typography>
+                          </Tooltip>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                          Query Text:
+                        </Typography>
+                        <Box 
+                          sx={{ 
+                            mt: 0.5,
+                            borderRadius: 1,
+                            maxHeight: '200px',
+                            overflow: 'hidden',
+                            border: '1px solid',
+                            borderColor: 'grey.300',
+                            '&:hover': {
+                              borderColor: 'grey.400'
+                            },
+                            '& .monaco-editor .scrollbar': {
+                              width: '8px',
+                              background: 'transparent'
+                            },
+                            '& .monaco-editor .scrollbar .slider': {
+                              background: '#bfbfbf',
+                              borderRadius: '4px',
+                              '&:hover': {
+                                background: '#a6a6a6'
+                              }
+                            }
+                          }}
+                        >
+                          <Editor
+                            height="200px"
+                            defaultLanguage="sql"
+                            value={selectedQuery.query_text}
+                            options={{
+                              readOnly: true,
+                              domReadOnly: true, // This prevents the read-only message
+                              minimap: { enabled: false },
+                              scrollBeyondLastLine: false,
+                              fontSize: 14,
+                              tabSize: 2,
+                              wordWrap: 'on',
+                              automaticLayout: true,
+                              scrollbar: {
+                                vertical: 'visible',
+                                horizontal: 'visible',
+                                verticalScrollbarSize: 8,
+                                horizontalScrollbarSize: 8,
+                                verticalSliderSize: 8,
+                                horizontalSliderSize: 8,
+                                alwaysConsumeMouseWheel: false
+                              },
+                              overviewRulerBorder: false,
+                              hideCursorInOverviewRuler: true,
+                              overviewRulerLanes: 0,
+                              lineNumbers: 'on',
+                              renderLineHighlight: 'none',
+                              contextmenu: false,
+                              folding: false,
+                              glyphMargin: false,
+                              renderValidationDecorations: 'off',
+                              ariaLabel: 'SQL Query'
+                            }}
+                          />
+                        </Box>
+                      </Box>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -1224,7 +1358,7 @@ export default function QueriesPage() {
                               {key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}:
                             </Typography>
                             <Typography variant="body2">
-                              {value || '-'}
+                              {value}
                             </Typography>
                           </Box>
                         ))}
@@ -1265,6 +1399,16 @@ export default function QueriesPage() {
                             {formatFileSize(selectedQuery.result_metadata?.file_size || 0)}
                           </Typography>
                         </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Final Path:
+                          </Typography>
+                          <Tooltip title={selectedQuery.result_metadata?.final_file_path || '-'}>
+                            <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                              {selectedQuery.result_metadata?.final_file_path || '-'}
+                            </Typography>
+                          </Tooltip>
+                        </Box>
                       </Box>
                     </CardContent>
                   </Card>
@@ -1296,6 +1440,24 @@ export default function QueriesPage() {
                             </Typography>
                           </Tooltip>
                         </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Export Filename:
+                          </Typography>
+                          <Tooltip title={selectedQuery.export_filename || 'Auto-generated'}>
+                            <Typography variant="body2" noWrap sx={{ maxWidth: 200 }}>
+                              {selectedQuery.export_filename || 'Auto-generated'}
+                            </Typography>
+                          </Tooltip>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">
+                            SSH Hostname:
+                          </Typography>
+                          <Typography variant="body2">
+                            {selectedQuery.ssh_hostname || 'Default Host'}
+                          </Typography>
+                        </Box>
                       </Box>
                     </CardContent>
                   </Card>
@@ -1316,6 +1478,10 @@ export default function QueriesPage() {
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                           <Typography variant="body2" color="text.secondary">Started:</Typography>
                           <Typography variant="body2">{formatDateTime(selectedQuery.started_at)}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Updated:</Typography>
+                          <Typography variant="body2">{formatDateTime(selectedQuery.updated_at)}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                           <Typography variant="body2" color="text.secondary">Completed:</Typography>

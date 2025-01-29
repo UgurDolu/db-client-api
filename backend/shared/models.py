@@ -74,6 +74,7 @@ class Query(Base):
     export_filename: Mapped[Optional[str]] = Column(String)  # Optional custom filename for exported file
     ssh_hostname: Mapped[Optional[str]] = Column(String)  # Optional SSH hostname for remote execution
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[Optional[datetime]] = Column(DateTime(timezone=True))  # When query execution starts
     updated_at: Mapped[Optional[datetime]] = Column(DateTime(timezone=True), onupdate=func.now())
     completed_at: Mapped[Optional[datetime]] = Column(DateTime(timezone=True))
     
