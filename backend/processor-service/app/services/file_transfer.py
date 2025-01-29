@@ -233,43 +233,10 @@ class FileTransferService:
             # Convert paths to use forward slashes and normalize
             local_path = local_path.replace('\\', '/')
             remote_path = remote_path.replace('\\', '/')
-            
-            # Get remote directory path with proper priority:
-            # 1. Query's export_location
-            # 2. User settings' export_location
-            # 3. Default export location
-            if query.export_location:
-                remote_dir = query.export_location.strip().replace('\\', '/').rstrip('/')
-                logger.info(f"Using export location from query: {remote_dir}")
-            elif self.settings and self.settings.export_location:
-                remote_dir = self.settings.export_location.strip().replace('\\', '/').rstrip('/')
-                logger.info(f"Using export location from user settings: {remote_dir}")
-            else:
-                remote_dir = settings.DEFAULT_EXPORT_LOCATION.strip().replace('\\', '/').rstrip('/')
-                logger.info(f"Using default export location: {remote_dir}")
-            
-            # Determine the filename:
-            # 1. Use query's export_filename if provided
-            # 2. Otherwise use {query_id}_query_{timestamp} format
-            if query.export_filename:
-                # Add file extension if not present in custom filename
-                if query.export_type and not query.export_filename.endswith(f".{query.export_type}"):
-                    filename = f"{query.export_filename}.{query.export_type}"
-                else:
-                    filename = query.export_filename
-                logger.info(f"Using custom filename from query: {filename}")
-            else:
-                # Generate default filename with timestamp
-                timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-                filename = f"{query.id}_query_{timestamp}"
-                if query.export_type:
-                    filename = f"{filename}.{query.export_type}"
-                logger.info(f"Using default filename format: {filename}")
-            
-            # Construct final remote path
-            remote_path = f"{remote_dir}/{filename}"
             logger.info(f"Final remote path: {remote_path}")
-            
+            # Extract remote directory by splitting the remote path
+            remote_dir = os.path.dirname(remote_path)
+            logger.info(f"Remote directory path: {remote_dir}")
             retries = 0
             last_error = None
             

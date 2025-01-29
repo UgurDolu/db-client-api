@@ -57,11 +57,17 @@ Content-Type: application/json
     "db_username": "t088503",
     "db_password": "hilaL250202",
     "db_tns": "localhost:1521/XE",
-    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 850"
+    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 9900000",
+    "export_location": "/home/testuser/testv1",
+    "export_filename": "load_test_1",
+    "export_type": "feather"
 }
 
+
+
+
 ### Get Query Stats
-GET http://localhost:8000/api/queries/162
+GET http://localhost:8000/api/queries/235
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZ21haWwuY29tIiwiZXhwIjoxNzM4MTc0OTQ3fQ.IQek2JeryH7q0XJ-kXHs0sHZ2_5FDmn1wmZAsvXrDTw
 
 ### Get Current Stats

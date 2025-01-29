@@ -199,20 +199,24 @@ class QueryExecutor:
                         (user_settings.export_location if user_settings else None) or 
                         settings.DEFAULT_EXPORT_LOCATION
                     )
-
+                    # Get export type from query or user settings
+                    export_type = query.export_type or (user_settings.export_type if user_settings else None) or 'csv'
+                    logger.info(f"Using export type: {export_type}")
+                    if export_type == 'excel':
+                        export_type = 'xlsx'
                     # Generate filename based on query settings or default format
                     if query.export_filename:
                         # Use custom filename from query
                         base_filename = query.export_filename
-                        if query.export_type and not base_filename.endswith(f".{query.export_type}"):
-                            filename = f"{base_filename}.{query.export_type}"
+                        if export_type and not base_filename.endswith(f".{export_type}"):
+                            filename = f"{base_filename}.{export_type}"
                         else:
                             filename = base_filename
                         logger.info(f"Using custom filename: {filename}")
                     else:
                         # Generate default filename with timestamp
                         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-                        filename = f"{query.id}_query_{timestamp}.{query.export_type or 'csv'}"
+                        filename = f"{query.id}_query_{timestamp}.{export_type}"
                         logger.info(f"Using default filename format: {filename}")
 
                     final_file_path = os.path.join(final_path, filename).replace("\\", "/")
@@ -231,7 +235,7 @@ class QueryExecutor:
                     
                     success = await transfer_service.transfer_file(
                         str(tmp_file_path),
-                        filename,  # Pass just the filename, let transfer service handle full path
+                        final_file_path,
                         str(query.user_id),
                         query
                     )
