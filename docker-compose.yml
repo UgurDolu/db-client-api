@@ -73,8 +73,6 @@ services:
       - SSH_PASSWORD=testpass
     ports:
       - "2222:22"
-    volumes:
-      - ./exports:/home/testuser/shared
     networks:
       - db_client_network
     restart: unless-stopped

@@ -59,7 +59,7 @@ Content-Type: application/json
     "db_tns": "localhost:1521/XE",
     "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 9900000",
     "export_location": "/home/testuser/testv1",
-    "export_filename": "load_test_1",
+    "export_filename": "load_test_4",
     "export_type": "feather"
 }
 
