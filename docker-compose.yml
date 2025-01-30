@@ -1,50 +1,73 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15
+  postgres:
+    image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=db_client
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-dbclient}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - db_client_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   api:
     build:
-      context: ./backend/api-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/api-service/Dockerfile
     ports:
       - "8000:8000"
     environment:
-      - POSTGRES_SERVER=db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=db_client
+      - DB_POSTGRES_SERVER=postgres
+      - DB_POSTGRES_USER=${DB_USER:-postgres}
+      - DB_POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_POSTGRES_DB=${DB_NAME:-dbclient}
+      - DB_POSTGRES_PORT=5432
+      - API_V1_STR=/api/v1
+      - SECURITY_SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - SECURITY_ACCESS_TOKEN_EXPIRE_MINUTES=43200
+    networks:
+      - db_client_network
     depends_on:
-      - db
+      postgres:
+        condition: service_healthy
 
   processor:
     build:
-      context: ./backend/processor-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/processor-service/Dockerfile
+    deploy:
+      mode: replicated
+      replicas: 1
     environment:
-      - POSTGRES_SERVER=db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=db_client
-      - QUERY_LISTENER_CHECK_INTERVAL=60
-      - QUERY_LISTENER_LOG_LEVEL=INFO
-      - DEFAULT_EXPORT_LOCATION=/app/exports
-      - TMP_EXPORT_LOCATION=/app/tmp/exports
-    volumes:
-      - ./exports:/app/exports
-      - ./tmp:/app/tmp
+      - DB_POSTGRES_SERVER=postgres
+      - DB_POSTGRES_USER=${DB_USER:-postgres}
+      - DB_POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_POSTGRES_DB=${DB_NAME:-dbclient}
+      - DB_POSTGRES_PORT=5432
+      - SECURITY_SECRET_KEY=${SECRET_KEY:-your-secret-key-here}
+      - SECURITY_ACCESS_TOKEN_EXPIRE_MINUTES=43200
+      - QUERY_GLOBAL_MAX_PARALLEL_QUERIES=50
+      - QUERY_QUERY_LISTENER_CHECK_INTERVAL=10
+      - QUERY_QUERY_LISTENER_LOG_LEVEL=INFO
+      - SCP_SCP_HOST=sshtest
+      - SCP_SCP_PORT=22
+      - SCP_SCP_USER=${SSH_USER:-testuser}
+      - SCP_SCP_PASSWORD=${SSH_PASSWORD:-testpass}
+    networks:
+      - db_client_network
     depends_on:
-      - db
-      - api
+      postgres:
+        condition: service_healthy
 
   oracle:
     image: container-registry.oracle.com/database/express:21.3.0-xe
@@ -57,6 +80,8 @@ services:
     volumes:
       - oracle_data:/opt/oracle/oradata
       - ./docker/oracle/init:/docker-entrypoint-initdb.d/startup
+    networks:
+      - db_client_network
     healthcheck:
       test: ["CMD", "sqlplus", "-L", "sys/oracle123@//localhost:1521/XE as sysdba", "@/docker-entrypoint-initdb.d/startup/healthcheck.sql"]
       interval: 30s
