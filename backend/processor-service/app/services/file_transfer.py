@@ -197,12 +197,11 @@ class FileTransferService:
         """Clean up the temporary exports directory."""
         try:
             if self.tmp_dir.exists():
-                shutil.rmtree(str(self.tmp_dir))
-                self.logger.info(f"Successfully cleaned up temporary directory: {self.tmp_dir}")
-                # Recreate empty directory
+                # Instead of removing the whole directory, just ensure it exists
                 self.ensure_directory(self.tmp_dir)
+                self.logger.info(f"Verified temporary directory exists: {self.tmp_dir}")
         except Exception as e:
-            self.logger.error(f"Error cleaning up temporary directory {self.tmp_dir}: {str(e)}", exc_info=True)
+            self.logger.error(f"Error checking temporary directory {self.tmp_dir}: {str(e)}", exc_info=True)
             raise
 
     async def transfer_file(self, local_path: str, remote_path: str, user_id: str, query: Query) -> bool:
@@ -214,6 +213,7 @@ class FileTransferService:
             user_id: ID of the user performing the transfer
             query: Query object containing status and error information
         """
+        success = False
         try:
             # Ensure local directory exists and file is readable
             local_path = os.path.abspath(local_path)
@@ -251,6 +251,7 @@ class FileTransferService:
                         result = await ssh.run(verify_cmd)
                         if result.exit_status == 0:
                             await ssh.run(f'chmod 644 "{remote_path}"')
+                            success = True
                             return True
                         else:
                             raise Exception(f"File transfer verification failed: {result.stderr}")
@@ -276,14 +277,13 @@ class FileTransferService:
             query.error_message = str(e)
             raise
         finally:
-            # Always clean up temporary files
-            try:
-                if os.path.exists(local_path):
+            # Only clean up the specific temporary file after the transfer is complete
+            if os.path.exists(local_path):
+                try:
                     os.remove(local_path)
-                    self.logger.info(f"Cleaned up temporary file: {local_path}")
-                await self.cleanup_tmp_directory()
-            except Exception as cleanup_error:
-                self.logger.error(f"Error during cleanup: {str(cleanup_error)}")
+                    self.logger.info(f"Cleaned up temporary file after {'successful' if success else 'failed'} transfer: {local_path}")
+                except Exception as cleanup_error:
+                    self.logger.error(f"Error cleaning up temporary file: {str(cleanup_error)}")
 
     def cleanup_tmp_file(self, file_path: str) -> bool:
         """Remove temporary file after successful transfer."""
