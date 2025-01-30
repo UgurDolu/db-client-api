@@ -27,7 +27,7 @@ class FileTransferService:
         
         Args:
             user_settings: Optional UserSettings object containing user's SSH credentials.
-                         If not provided, will use environment settings.
+            If not provided, will use environment settings.
         """
         self.settings = user_settings
         # Create tmp directory
