@@ -4,7 +4,7 @@ from app.core.config import settings
 engine = create_async_engine(
     settings.get_database_uri(),
     pool_pre_ping=True,
-    echo=True,
+    echo=False,
     # Increase pool size and overflow
     pool_size=20,  # Default is 5
     max_overflow=30,  # Default is 10
@@ -13,7 +13,7 @@ engine = create_async_engine(
     # Increase timeout for operations
     pool_timeout=60,  # Wait up to 60 seconds for a connection
     # Enable connection debugging
-    echo_pool=True
+    echo_pool=False
 )
 
 AsyncSessionLocal = async_sessionmaker(
