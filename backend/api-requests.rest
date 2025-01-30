@@ -31,7 +31,7 @@ Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5AZGVuLmNvbSIsImV4cCI6MTczODMyMzc1Nn0.fSk288jpP3vr70wbFGehRWUZirw5Qgup-2QWYSMZ4EM
 
 {
-    "export_location": "/home/testuser/mertloadtest",
+    "export_location": "/home/testuser/deneme",
     "export_type": "csv",
     "max_parallel_queries": 3,
     "ssh_username": "testuser",
