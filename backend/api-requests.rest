@@ -5,7 +5,7 @@ POST http://localhost:8000/api/auth/register
 Content-Type: application/json
 
 {
-    "email": "ugur@gmail.com",
+    "email": "den@den.com",
     "password": "deneme"
 }
 
@@ -13,22 +13,22 @@ Content-Type: application/json
 POST http://localhost:8000/api/auth/login
 Content-Type: application/x-www-form-urlencoded
 
-username=ugur@gmail.com&password=deneme
+username=den@den.com&password=deneme
 
 ### User Management Endpoints
 
 ### Get all users
 GET http://localhost:8000/api/users/profile
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODI0NTQxMn0.PuQMzGRbI7QK425PfGRO8VN-FK0MHqP2Wg6XFyajXdI
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5AZGVuLmNvbSIsImV4cCI6MTczODMyMzc1Nn0.fSk288jpP3vr70wbFGehRWUZirw5Qgup-2QWYSMZ4EM
 
 ### Get specific user
 GET http://localhost:8000/api/users/settings
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODI0NTQxMn0.PuQMzGRbI7QK425PfGRO8VN-FK0MHqP2Wg6XFyajXdI
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5AZGVuLmNvbSIsImV4cCI6MTczODMyMzc1Nn0.fSk288jpP3vr70wbFGehRWUZirw5Qgup-2QWYSMZ4EM
 
 ### Update user
 PUT http://localhost:8000/api/users/settings
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODI0NTQxMn0.PuQMzGRbI7QK425PfGRO8VN-FK0MHqP2Wg6XFyajXdI
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5AZGVuLmNvbSIsImV4cCI6MTczODMyMzc1Nn0.fSk288jpP3vr70wbFGehRWUZirw5Qgup-2QWYSMZ4EM
 
 {
     "export_location": "/home/testuser/mertloadtest",
@@ -46,11 +46,11 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtY
 
 ### List queries
 GET http://localhost:8000/api/queries/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODI0NTQxMn0.PuQMzGRbI7QK425PfGRO8VN-FK0MHqP2Wg6XFyajXdI
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5AZGVuLmNvbSIsImV4cCI6MTczODMyMzc1Nn0.fSk288jpP3vr70wbFGehRWUZirw5Qgup-2QWYSMZ4EM
 
 ### Post New Query
 POST http://localhost:8000/api/queries/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODI0NTQxMn0.PuQMzGRbI7QK425PfGRO8VN-FK0MHqP2Wg6XFyajXdI
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5AZGVuLmNvbSIsImV4cCI6MTczODMyMzc1Nn0.fSk288jpP3vr70wbFGehRWUZirw5Qgup-2QWYSMZ4EM
 Content-Type: application/json
 
 {   
@@ -65,19 +65,19 @@ Content-Type: application/json
 
 ### Get Query Stats
 GET http://localhost:8000/api/queries/243
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODI0NTQxMn0.PuQMzGRbI7QK425PfGRO8VN-FK0MHqP2Wg6XFyajXdI
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5AZGVuLmNvbSIsImV4cCI6MTczODMyMzc1Nn0.fSk288jpP3vr70wbFGehRWUZirw5Qgup-2QWYSMZ4EM
 
 ### Get Current Stats
 GET http://localhost:8000/api/queries/stats/current
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODI0NTQxMn0.PuQMzGRbI7QK425PfGRO8VN-FK0MHqP2Wg6XFyajXdI
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5AZGVuLmNvbSIsImV4cCI6MTczODMyMzc1Nn0.fSk288jpP3vr70wbFGehRWUZirw5Qgup-2QWYSMZ4EM
 
 ### Delete Query
 DELETE http://localhost:8000/api/queries/88
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODI0NTQxMn0.PuQMzGRbI7QK425PfGRO8VN-FK0MHqP2Wg6XFyajXdI
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5AZGVuLmNvbSIsImV4cCI6MTczODMyMzc1Nn0.fSk288jpP3vr70wbFGehRWUZirw5Qgup-2QWYSMZ4EM
 
 ### Batch Rerun Queries
 POST http://localhost:8000/api/queries/batch/rerun
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGdtYWlsLmNvbSIsImV4cCI6MTczODI0NTQxMn0.PuQMzGRbI7QK425PfGRO8VN-FK0MHqP2Wg6XFyajXdI
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5AZGVuLmNvbSIsImV4cCI6MTczODMyMzc1Nn0.fSk288jpP3vr70wbFGehRWUZirw5Qgup-2QWYSMZ4EM
 Content-Type: application/json
 
 {
