@@ -1,6 +1,5 @@
 import asyncio
 import os
-import logging
 import shutil
 from pathlib import Path
 import asyncssh
@@ -8,18 +7,10 @@ from app.core.config import settings
 from typing import Optional
 from app.db.models import UserSettings, Query, QueryStatus  # Import QueryStatus
 from datetime import datetime
+from app.core.logger import Logger
 
-# Configure logger with console handler
-logger = logging.getLogger(__name__)
-logger.setLevel(getattr(logging, settings.QUERY_LISTENER_LOG_LEVEL))
-
-# Add console handler if not already present
-if not logger.handlers:
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
+# Initialize logger
+logger = Logger("file_transfer").get_logger()
 
 class FileTransferService:
     def __init__(self, user_settings: Optional[UserSettings] = None):
@@ -29,6 +20,7 @@ class FileTransferService:
             user_settings: Optional UserSettings object containing user's SSH credentials.
             If not provided, will use environment settings.
         """
+        self.logger = Logger("FileTransferService").get_logger()
         self.settings = user_settings
         # Create tmp directory
         self.tmp_dir = Path(settings.TMP_EXPORT_LOCATION)
@@ -36,20 +28,21 @@ class FileTransferService:
         self.max_retries = 3
         self.retry_delay = 2  # seconds
         
+        
         # Log initialization details
         if user_settings and user_settings.ssh_username:
-            logger.info(f"Initialized FileTransferService with user SSH credentials (username: {user_settings.ssh_username})")
+            self.logger.info(f"Initialized FileTransferService with user SSH credentials (username: {user_settings.ssh_username})")
         else:
-            logger.info("Initialized FileTransferService with environment SSH credentials")
-        logger.info(f"Using tmp directory: {self.tmp_dir}")
+            self.logger.info("Initialized FileTransferService with environment SSH credentials")
+        self.logger.info(f"Using tmp directory: {self.tmp_dir}")
 
     def ensure_directory(self, path: Path) -> None:
         """Ensure directory exists, create if it doesn't."""
         try:
             path.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Ensured directory exists: {path}")
+            self.logger.info(f"Ensured directory exists: {path}")
         except Exception as e:
-            logger.error(f"Error creating directory {path}: {str(e)}")
+            self.logger.error(f"Error creating directory {path}: {str(e)}")
             raise
 
     async def get_ssh_connection(self, query: Optional[Query] = None):
@@ -62,15 +55,15 @@ class FileTransferService:
             # First check if query has SSH hostname specified
             if query and query.ssh_hostname:
                 host = query.ssh_hostname
-                logger.info(f"Using SSH hostname from query: {host}")
+                self.logger.info(f"Using SSH hostname from query: {host}")
             # Then check if user has their own SSH settings
             elif self.settings and self.settings.ssh_hostname:
                 host = self.settings.ssh_hostname
-                logger.info(f"Using SSH hostname from user settings: {host}")
+                self.logger.info(f"Using SSH hostname from user settings: {host}")
             else:
                 # Fall back to environment settings
                 host = settings.SSH_HOST
-                logger.info(f"Using default SSH hostname: {host}")
+                self.logger.info(f"Using default SSH hostname: {host}")
 
             # Get remaining connection details from user settings or environment
             if (self.settings and 
@@ -82,7 +75,7 @@ class FileTransferService:
                 password = self.settings.ssh_password if self.settings.ssh_password else None
                 ssh_key = self.settings.ssh_key
                 key_passphrase = self.settings.ssh_key_passphrase.get_secret_value() if self.settings.ssh_key_passphrase else None
-                logger.info("Using user's SSH credentials")
+                self.logger.info("Using user's SSH credentials")
             else:
                 # Fall back to environment settings
                 port = settings.SSH_PORT
@@ -90,12 +83,12 @@ class FileTransferService:
                 password = settings.SSH_PASSWORD
                 ssh_key = settings.SSH_KEY
                 key_passphrase = settings.SSH_KEY_PASSPHRASE
-                logger.info("Using environment SSH credentials")
+                self.logger.info("Using environment SSH credentials")
 
             # Log connection attempt details (excluding sensitive info)
-            logger.info(f"Attempting SSH connection to {host}:{port}")
-            logger.info(f"Using username: {username}")
-            logger.info(f"Authentication method: {'SSH key' if ssh_key else 'Password'}")
+            self.logger.info(f"Attempting SSH connection to {host}:{port}")
+            self.logger.info(f"Using username: {username}")
+            self.logger.info(f"Authentication method: {'SSH key' if ssh_key else 'Password'}")
 
             ssh_options = {
                 'host': host,
@@ -108,7 +101,7 @@ class FileTransferService:
 
             if ssh_key:
                 # Use SSH key authentication if key is provided
-                logger.info("Using SSH key authentication")
+                self.logger.info("Using SSH key authentication")
                 # Create a temporary file for the SSH key
                 import tempfile
                 with tempfile.NamedTemporaryFile(mode='w', delete=False) as key_file:
@@ -121,7 +114,7 @@ class FileTransferService:
                         ssh_options['passphrase'] = key_passphrase
                     
                     client = await asyncssh.connect(**ssh_options)
-                    logger.info("SSH connection established successfully using key authentication")
+                    self.logger.info("SSH connection established successfully using key authentication")
                 finally:
                     # Clean up the temporary key file
                     try:
@@ -133,30 +126,30 @@ class FileTransferService:
                 if not password:
                     raise ValueError("No password provided for SSH connection")
                     
-                logger.info("Using password authentication")
+                self.logger.info("Using password authentication")
                 ssh_options['password'] = password
                 client = await asyncssh.connect(**ssh_options)
-                logger.info("SSH connection established successfully using password authentication")
+                self.logger.info("SSH connection established successfully using password authentication")
 
             # Test the connection
             result = await client.run('pwd')
-            logger.info(f"Current remote directory: {result.stdout.strip()}")
+            self.logger.info(f"Current remote directory: {result.stdout.strip()}")
             
             return client
         except asyncssh.DisconnectError as e:
-            logger.error(f"SSH connection failed - disconnected: {str(e)}")
+            self.logger.error(f"SSH connection failed - disconnected: {str(e)}")
             raise
         except asyncssh.ProcessError as e:
-            logger.error(f"SSH process error: {str(e)}")
+            self.logger.error(f"SSH process error: {str(e)}")
             raise
         except asyncssh.PermissionDenied as e:
-            logger.error(f"SSH permission denied: {str(e)}")
+            self.logger.error(f"SSH permission denied: {str(e)}")
             raise
         except asyncssh.ChannelOpenError as e:
-            logger.error(f"SSH channel open failed: {str(e)}")
+            self.logger.error(f"SSH channel open failed: {str(e)}")
             raise
         except Exception as e:
-            logger.error(f"SSH connection failed: {str(e)}", exc_info=True)
+            self.logger.error(f"SSH connection failed: {str(e)}", exc_info=True)
             raise
 
     async def upload_file(self, local_path: str, remote_path: str, query: Optional[Query] = None):
@@ -164,10 +157,10 @@ class FileTransferService:
         try:
             async with await self.get_ssh_connection(query) as conn:
                 await asyncssh.scp(local_path, (conn, remote_path))
-                logger.info(f"Successfully uploaded {local_path} to {remote_path}")
+                self.logger.info(f"Successfully uploaded {local_path} to {remote_path}")
                 return True
         except Exception as e:
-            logger.error(f"File upload failed: {str(e)}")
+            self.logger.error(f"File upload failed: {str(e)}")
             if query:
                 query.status = QueryStatus.failed.value
                 query.error_message = f"File upload failed: {str(e)}"
@@ -178,10 +171,10 @@ class FileTransferService:
         try:
             async with await self.get_ssh_connection(query) as conn:
                 await asyncssh.scp((conn, remote_path), local_path)
-                logger.info(f"Successfully downloaded {remote_path} to {local_path}")
+                self.logger.info(f"Successfully downloaded {remote_path} to {local_path}")
                 return True
         except Exception as e:
-            logger.error(f"File download failed: {str(e)}")
+            self.logger.error(f"File download failed: {str(e)}")
             if query:
                 query.status = QueryStatus.failed.value
                 query.error_message = f"File download failed: {str(e)}"
@@ -194,7 +187,7 @@ class FileTransferService:
                 result = await conn.run(f'ls -la {remote_path}')
                 return result.stdout
         except Exception as e:
-            logger.error(f"Failed to list remote files: {str(e)}")
+            self.logger.error(f"Failed to list remote files: {str(e)}")
             if query:
                 query.status = QueryStatus.failed.value
                 query.error_message = f"Failed to list remote files: {str(e)}"
@@ -205,11 +198,11 @@ class FileTransferService:
         try:
             if self.tmp_dir.exists():
                 shutil.rmtree(str(self.tmp_dir))
-                logger.info(f"Successfully cleaned up temporary directory: {self.tmp_dir}")
+                self.logger.info(f"Successfully cleaned up temporary directory: {self.tmp_dir}")
                 # Recreate empty directory
                 self.ensure_directory(self.tmp_dir)
         except Exception as e:
-            logger.error(f"Error cleaning up temporary directory {self.tmp_dir}: {str(e)}", exc_info=True)
+            self.logger.error(f"Error cleaning up temporary directory {self.tmp_dir}: {str(e)}", exc_info=True)
             raise
 
     async def transfer_file(self, local_path: str, remote_path: str, user_id: str, query: Query) -> bool:
@@ -233,10 +226,10 @@ class FileTransferService:
             # Convert paths to use forward slashes and normalize
             local_path = local_path.replace('\\', '/')
             remote_path = remote_path.replace('\\', '/')
-            logger.info(f"Final remote path: {remote_path}")
+            self.logger.info(f"Final remote path: {remote_path}")
             # Extract remote directory by splitting the remote path
             remote_dir = os.path.dirname(remote_path)
-            logger.info(f"Remote directory path: {remote_dir}")
+            self.logger.info(f"Remote directory path: {remote_dir}")
             retries = 0
             last_error = None
             
@@ -250,7 +243,7 @@ class FileTransferService:
                             raise Exception(f"Failed to create remote directory: {result.stderr}")
                         
                         # Transfer the file using SCP
-                        logger.info(f"Starting SCP transfer: {local_path} -> {remote_path}")
+                        self.logger.info(f"Starting SCP transfer: {local_path} -> {remote_path}")
                         await asyncssh.scp(local_path, (ssh, remote_path))
                         
                         # Verify the file exists and set permissions
@@ -264,7 +257,7 @@ class FileTransferService:
                             
                 except Exception as ssh_error:
                     last_error = str(ssh_error)
-                    logger.error(f"SSH transfer attempt {retries + 1} failed: {last_error}")
+                    self.logger.error(f"SSH transfer attempt {retries + 1} failed: {last_error}")
                     if retries + 1 < self.max_retries:
                         retries += 1
                         await asyncio.sleep(self.retry_delay)
@@ -287,19 +280,19 @@ class FileTransferService:
             try:
                 if os.path.exists(local_path):
                     os.remove(local_path)
-                    logger.info(f"Cleaned up temporary file: {local_path}")
+                    self.logger.info(f"Cleaned up temporary file: {local_path}")
                 await self.cleanup_tmp_directory()
             except Exception as cleanup_error:
-                logger.error(f"Error during cleanup: {str(cleanup_error)}")
+                self.logger.error(f"Error during cleanup: {str(cleanup_error)}")
 
     def cleanup_tmp_file(self, file_path: str) -> bool:
         """Remove temporary file after successful transfer."""
         try:
             Path(file_path).unlink()
-            logger.info(f"Successfully cleaned up temporary file: {file_path}")
+            self.logger.info(f"Successfully cleaned up temporary file: {file_path}")
             return True
         except Exception as e:
-            logger.error(f"Error cleaning up temporary file {file_path}: {str(e)}", exc_info=True)
+            self.logger.error(f"Error cleaning up temporary file {file_path}: {str(e)}", exc_info=True)
             return False
 
     def get_tmp_path(self, filename: str) -> str:
@@ -321,7 +314,7 @@ class Progress:
         
         # Log every 10% progress
         if percentage >= self.last_percentage + 10:
-            logger.info(f"Transfer progress: {percentage}% ({transferred}/{self.total_size} bytes)")
+            self.logger.info(f"Transfer progress: {percentage}% ({transferred}/{self.total_size} bytes)")
             self.last_percentage = percentage
 
 # Create singleton instance

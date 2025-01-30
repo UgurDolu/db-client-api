@@ -1,18 +1,20 @@
 import asyncio
 from asyncio import Queue, Lock
 from typing import Dict, Set, Optional
-import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import AsyncSessionLocal
 from app.db.models import Query, UserSettings
 from app.services.query_executor import QueryExecutor
 from app.core.config import settings
+from app.core.logger import Logger
 
-logger = logging.getLogger(__name__)
+# Initialize logger
+logger = Logger("queue_manager").get_logger()
 
 class QueueManager:
     def __init__(self):
+        self.logger = Logger("QueueManager").get_logger()
         self.queued_queries: Queue = Queue()
         self.running_queries: Set[int] = set()
         self.all_tracked_queries: Set[int] = set()
@@ -22,6 +24,7 @@ class QueueManager:
         self.user_running_queries: Dict[int, Set[int]] = {}
         # Global limit from settings
         self.global_max_parallel = getattr(settings, 'GLOBAL_MAX_PARALLEL_QUERIES', 50)
+        
         
     async def add_query(self, query_id: int, user_id: int):
         """Add a query to the processing queue."""
