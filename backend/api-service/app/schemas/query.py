@@ -77,4 +77,6 @@ class BatchOperationResponse(BaseModel):
 
 class QueryStats(BaseModel):
     running_queries: int
-    queued_queries: int 
+    queued_queries: int
+    pending_queries: int
+    transferring_queries: int 

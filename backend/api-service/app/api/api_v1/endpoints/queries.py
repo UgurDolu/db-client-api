@@ -353,37 +353,28 @@ async def get_current_stats(
     current_user: UserModel = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get current stats of running and queued queries"""
+    """Get current query statistics for the user"""
     try:
-        # Get count of running queries
-        running_result = await db.execute(
-            select(func.count())
-            .where(
-                QueryModel.user_id == current_user.id,
-                QueryModel.status == "running"
-            )
+        # Get counts for each status
+        result = await db.execute(
+            select(
+                func.count(QueryModel.id).filter(QueryModel.status == QueryStatus.running.value).label('running'),
+                func.count(QueryModel.id).filter(QueryModel.status == QueryStatus.queued.value).label('queued'),
+                func.count(QueryModel.id).filter(QueryModel.status == QueryStatus.pending.value).label('pending'),
+                func.count(QueryModel.id).filter(QueryModel.status == QueryStatus.transferring.value).label('transferring')
+            ).where(QueryModel.user_id == current_user.id)
         )
-        running_count = running_result.scalar_one()
-
-        # Get count of queued queries
-        queued_result = await db.execute(
-            select(func.count())
-            .where(
-                QueryModel.user_id == current_user.id,
-                QueryModel.status == "queued"
-            )
-        )
-        queued_count = queued_result.scalar_one()
-
-        logger.info(f"Stats for user {current_user.id}: running={running_count}, queued={queued_count}")
-        return QueryStats(
-            running_queries=running_count,
-            queued_queries=queued_count
-        )
-            
+        stats = result.one()
+        
+        return {
+            "running_queries": stats.running,
+            "queued_queries": stats.queued,
+            "pending_queries": stats.pending,
+            "transferring_queries": stats.transferring
+        }
     except Exception as e:
         logger.error(f"Error getting query stats: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get query stats: {str(e)}"
+            detail="Failed to get query statistics"
         ) 

@@ -64,7 +64,7 @@ Content-Type: application/json
 
 
 ### Get Query Stats
-GET http://localhost:8000/api/queries/243
+GET http://localhost:8000/api/v1/queries/4
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 
 ### Get Current Stats

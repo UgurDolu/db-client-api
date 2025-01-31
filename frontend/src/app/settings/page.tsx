@@ -11,7 +11,23 @@ import {
   Typography,
   Alert,
   CircularProgress,
+  Divider,
+  Paper,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import {
+  Save as SaveIcon,
+  Settings as SettingsIcon,
+  Folder as FolderIcon,
+  Code as CodeIcon,
+  Speed as SpeedIcon,
+  Computer as ComputerIcon,
+  Numbers as PortIcon,
+  Person as UserIcon,
+  Key as PasswordIcon,
+  Info as InfoIcon,
+} from '@mui/icons-material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { apiClient, UserSettings } from '../../service/api';
@@ -94,24 +110,49 @@ export default function SettingsPage() {
 
   return (
     <Box sx={{ flexGrow: 1 }}>
-      <Typography variant="h4" gutterBottom>
-        Settings
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Box display="flex" alignItems="center" gap={1}>
+          <SettingsIcon color="primary" fontSize="large" />
+          <Typography variant="h4">Settings</Typography>
+        </Box>
+        <Tooltip title="Save Settings">
+          <Button
+            variant="contained"
+            startIcon={<SaveIcon />}
+            onClick={() => formik.handleSubmit()}
+            sx={{ borderRadius: 2 }}
+          >
+            Save Changes
+          </Button>
+        </Tooltip>
+      </Box>
 
       {saveSuccess && (
-        <Alert severity="success" sx={{ mb: 2 }}>
+        <Alert 
+          severity="success" 
+          sx={{ mb: 2 }}
+          icon={<InfoIcon />}
+        >
           Settings saved successfully!
         </Alert>
       )}
 
       {saveError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
+        <Alert 
+          severity="error" 
+          sx={{ mb: 2 }}
+          icon={<InfoIcon />}
+        >
           {saveError}
         </Alert>
       )}
 
-      <Card>
+      <Card sx={{ mb: 4 }}>
         <CardContent>
+          <Box display="flex" alignItems="center" gap={1} mb={3}>
+            <CodeIcon color="primary" />
+            <Typography variant="h6">Export Settings</Typography>
+          </Box>
           <form onSubmit={formik.handleSubmit}>
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
@@ -121,14 +162,11 @@ export default function SettingsPage() {
                   label="Default Export Location"
                   value={formik.values.export_location}
                   onChange={formik.handleChange}
-                  error={
-                    formik.touched.export_location &&
-                    Boolean(formik.errors.export_location)
-                  }
-                  helperText={
-                    formik.touched.export_location &&
-                    formik.errors.export_location
-                  }
+                  error={formik.touched.export_location && Boolean(formik.errors.export_location)}
+                  helperText={formik.touched.export_location && formik.errors.export_location}
+                  InputProps={{
+                    startAdornment: <FolderIcon color="action" sx={{ mr: 1 }} />,
+                  }}
                 />
               </Grid>
 
@@ -139,13 +177,11 @@ export default function SettingsPage() {
                   label="Default Export Type"
                   value={formik.values.export_type}
                   onChange={formik.handleChange}
-                  error={
-                    formik.touched.export_type &&
-                    Boolean(formik.errors.export_type)
-                  }
-                  helperText={
-                    formik.touched.export_type && formik.errors.export_type
-                  }
+                  error={formik.touched.export_type && Boolean(formik.errors.export_type)}
+                  helperText={formik.touched.export_type && formik.errors.export_type}
+                  InputProps={{
+                    startAdornment: <CodeIcon color="action" sx={{ mr: 1 }} />,
+                  }}
                 />
               </Grid>
 
@@ -157,23 +193,26 @@ export default function SettingsPage() {
                   label="Max Parallel Queries"
                   value={formik.values.max_parallel_queries}
                   onChange={formik.handleChange}
-                  error={
-                    formik.touched.max_parallel_queries &&
-                    Boolean(formik.errors.max_parallel_queries)
-                  }
-                  helperText={
-                    formik.touched.max_parallel_queries &&
-                    formik.errors.max_parallel_queries
-                  }
+                  error={formik.touched.max_parallel_queries && Boolean(formik.errors.max_parallel_queries)}
+                  helperText={formik.touched.max_parallel_queries && formik.errors.max_parallel_queries}
+                  InputProps={{
+                    startAdornment: <SpeedIcon color="action" sx={{ mr: 1 }} />,
+                  }}
                 />
               </Grid>
+            </Grid>
+          </form>
+        </CardContent>
+      </Card>
 
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                  SSH Settings
-                </Typography>
-              </Grid>
-
+      <Card>
+        <CardContent>
+          <Box display="flex" alignItems="center" gap={1} mb={3}>
+            <ComputerIcon color="primary" />
+            <Typography variant="h6">SSH Settings</Typography>
+          </Box>
+          <form onSubmit={formik.handleSubmit}>
+            <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
@@ -181,13 +220,11 @@ export default function SettingsPage() {
                   label="SSH Hostname"
                   value={formik.values.ssh_hostname}
                   onChange={formik.handleChange}
-                  error={
-                    formik.touched.ssh_hostname &&
-                    Boolean(formik.errors.ssh_hostname)
-                  }
-                  helperText={
-                    formik.touched.ssh_hostname && formik.errors.ssh_hostname
-                  }
+                  error={formik.touched.ssh_hostname && Boolean(formik.errors.ssh_hostname)}
+                  helperText={formik.touched.ssh_hostname && formik.errors.ssh_hostname}
+                  InputProps={{
+                    startAdornment: <ComputerIcon color="action" sx={{ mr: 1 }} />,
+                  }}
                 />
               </Grid>
 
@@ -199,10 +236,11 @@ export default function SettingsPage() {
                   label="SSH Port"
                   value={formik.values.ssh_port}
                   onChange={formik.handleChange}
-                  error={
-                    formik.touched.ssh_port && Boolean(formik.errors.ssh_port)
-                  }
+                  error={formik.touched.ssh_port && Boolean(formik.errors.ssh_port)}
                   helperText={formik.touched.ssh_port && formik.errors.ssh_port}
+                  InputProps={{
+                    startAdornment: <PortIcon color="action" sx={{ mr: 1 }} />,
+                  }}
                 />
               </Grid>
 
@@ -213,13 +251,11 @@ export default function SettingsPage() {
                   label="SSH Username"
                   value={formik.values.ssh_username}
                   onChange={formik.handleChange}
-                  error={
-                    formik.touched.ssh_username &&
-                    Boolean(formik.errors.ssh_username)
-                  }
-                  helperText={
-                    formik.touched.ssh_username && formik.errors.ssh_username
-                  }
+                  error={formik.touched.ssh_username && Boolean(formik.errors.ssh_username)}
+                  helperText={formik.touched.ssh_username && formik.errors.ssh_username}
+                  InputProps={{
+                    startAdornment: <UserIcon color="action" sx={{ mr: 1 }} />,
+                  }}
                 />
               </Grid>
 
@@ -231,25 +267,12 @@ export default function SettingsPage() {
                   label="SSH Password"
                   value={formik.values.ssh_password}
                   onChange={formik.handleChange}
-                  error={
-                    formik.touched.ssh_password &&
-                    Boolean(formik.errors.ssh_password)
-                  }
-                  helperText={
-                    formik.touched.ssh_password && formik.errors.ssh_password
-                  }
+                  error={formik.touched.ssh_password && Boolean(formik.errors.ssh_password)}
+                  helperText={formik.touched.ssh_password && formik.errors.ssh_password}
+                  InputProps={{
+                    startAdornment: <PasswordIcon color="action" sx={{ mr: 1 }} />,
+                  }}
                 />
-              </Grid>
-
-              <Grid item xs={12}>
-                <Button
-                  type="submit"
-                  variant="contained"
-                  size="large"
-                  sx={{ mt: 2 }}
-                >
-                  Save Settings
-                </Button>
               </Grid>
             </Grid>
           </form>
