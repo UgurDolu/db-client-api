@@ -13,7 +13,7 @@ Content-Type: application/json
 POST http://localhost:8000/api/v1/auth/login
 Content-Type: application/x-www-form-urlencoded
 
-username=ugur@deneme.com&password=deneme
+username=deneme@deneme.com&password=deneme
 
 ### User Management Endpoints
 
@@ -54,8 +54,8 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlb
 Content-Type: application/json
 
 {   
-    "db_username": "t088503",
-    "db_password": "hilaL250202",
+    "db_username": "db_username",
+    "db_password": "db_password",
     "db_tns": "oracle:1521/XE",
     "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 50"
 }
