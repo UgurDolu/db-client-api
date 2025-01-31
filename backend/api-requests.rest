@@ -33,7 +33,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZ
 {
     "export_location": "/home/testuser/deneme",
     "export_type": "feather",
-    "max_parallel_queries": 3,
+    "max_parallel_queries": 3,  
     "ssh_username": "testuser",
     "ssh_hostname": "sshtest",
     "ssh_port": 22,
