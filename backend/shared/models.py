@@ -66,7 +66,11 @@ class Query(Base):
     db_username: Mapped[str] = Column(String, nullable=False)
     db_password: Mapped[str] = Column(String, nullable=False)
     db_tns: Mapped[str] = Column(String, nullable=False)
-    status: Mapped[str] = Column(String, default=QueryStatus.pending.value)
+    status: Mapped[QueryStatus] = Column(
+        Enum(QueryStatus, name='query_status', create_type=False),
+        nullable=False,
+        default=QueryStatus.pending
+    )
     error_message: Mapped[Optional[str]] = Column(String)
     result_metadata: Mapped[Optional[dict]] = Column(JSON)
     export_location: Mapped[Optional[str]] = Column(String)
@@ -75,7 +79,7 @@ class Query(Base):
     ssh_hostname: Mapped[Optional[str]] = Column(String)  # Optional SSH hostname for remote execution
     created_at: Mapped[datetime] = Column(DateTime(timezone=True), server_default=func.now())
     started_at: Mapped[Optional[datetime]] = Column(DateTime(timezone=True))  # When query execution starts
-    updated_at: Mapped[Optional[datetime]] = Column(DateTime(timezone=True), onupdate=func.now())
+    updated_at: Mapped[datetime] = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     completed_at: Mapped[Optional[datetime]] = Column(DateTime(timezone=True))
     
     # Relationships

@@ -14,7 +14,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres;
 DROP TYPE IF EXISTS query_status CASCADE;
 
 -- Create the QueryStatus enum type
-CREATE TYPE query_status AS ENUM ('pending', 'queued', 'running', 'completed', 'failed');
+CREATE TYPE query_status AS ENUM ('pending', 'queued', 'running', 'transferring', 'completed', 'failed');
 
 -- Create function to compare query_status with text
 CREATE OR REPLACE FUNCTION compare_query_status(query_status, text)

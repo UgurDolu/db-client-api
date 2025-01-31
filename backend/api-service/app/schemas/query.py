@@ -1,15 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
-from enum import Enum
-
-class QueryStatus(str, Enum):
-    pending = "pending"
-    queued = "queued"
-    running = "running"
-    transferring = "transferring"
-    completed = "completed"
-    failed = "failed"
+from shared.models import QueryStatus
 
 class QueryBase(BaseModel):
     query_text: str
@@ -33,14 +25,14 @@ class QueryUpdate(BaseModel):
     export_type: Optional[str] = None
     export_filename: Optional[str] = None
     ssh_hostname: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[QueryStatus] = None
     error_message: Optional[str] = None
     result_metadata: Optional[Dict[str, Any]] = None
 
 class Query(QueryBase):
     id: int
     user_id: int
-    status: str = QueryStatus.pending.value
+    status: QueryStatus = QueryStatus.pending
     error_message: Optional[str] = None
     result_metadata: Optional[Dict[str, Any]] = None
     created_at: datetime

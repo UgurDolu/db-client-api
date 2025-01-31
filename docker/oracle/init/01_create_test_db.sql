@@ -8,10 +8,14 @@ CREATE USER example IDENTIFIED BY example123;
 GRANT CREATE SESSION TO example;
 GRANT UNLIMITED TABLESPACE TO example;
 GRANT CREATE TABLE TO example;
+GRANT SELECT ANY TABLE TO example WITH GRANT OPTION;
+GRANT CREATE ANY TABLE TO example;
+GRANT ALL PRIVILEGES TO example;
 
 -- Create test user
 CREATE USER t088503 IDENTIFIED BY hilaL250202;
 GRANT CREATE SESSION TO t088503;
+GRANT SELECT ANY TABLE TO t088503;
 
 -- Create test table in example schema
 CREATE TABLE example.test_data (
@@ -96,4 +100,10 @@ CREATE INDEX example.test_data_hire_date_idx ON example.test_data(hire_date);
 EXEC DBMS_STATS.GATHER_TABLE_STATS('EXAMPLE', 'TEST_DATA');
 
 -- Grant select permission to the test user
-GRANT SELECT ON example.test_data TO t088503; 
+GRANT SELECT ANY TABLE TO t088503;
+GRANT SELECT ON example.test_data TO t088503;
+ALTER USER t088503 QUOTA UNLIMITED ON USERS;
+
+-- Verify the grants
+SELECT * FROM DBA_TAB_PRIVS WHERE GRANTEE = 'T088503';
+EXIT; 

@@ -83,7 +83,7 @@ services:
     networks:
       - db_client_network
     healthcheck:
-      test: ["CMD", "sqlplus", "-L", "sys/oracle123@//localhost:1521/XE as sysdba", "@/docker-entrypoint-initdb.d/startup/healthcheck.sql"]
+      test: ["CMD", "sqlplus", "-L", "sys/oracle123@//localhost:1521/XE as sysdba", "@/opt/oracle/scripts/startup/healthcheck.sql"]
       interval: 30s
       timeout: 10s
       retries: 5
