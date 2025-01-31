@@ -61,21 +61,16 @@ app.add_middleware(
 # Include API routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Mount static files
-app.mount("/assets", StaticFiles(directory="static/assets"), name="assets")
 
 @app.get("/")
 async def root():
-    return FileResponse("static/index.html")
-
-@app.get("/{full_path:path}")
-async def serve_spa(full_path: str):
-    # Serve API documentation
-    if full_path == "docs" or full_path == "redoc":
-        raise HTTPException(status_code=404)
-    
-    # For all other paths, serve the SPA index.html
-    return FileResponse("static/index.html")
+    return {
+        "name": settings.PROJECT_NAME,
+        "version": "1.0.0",
+        "description": "API Service",
+        "status": "running",
+        "api_docs": f"{settings.API_V1_STR}/docs"
+    }
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
