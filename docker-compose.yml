@@ -107,6 +107,19 @@ services:
       timeout: 10s
       retries: 3
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    networks:
+      - db_client_network
+    depends_on:
+      - api
+
 networks:
   db_client_network:
     driver: bridge
