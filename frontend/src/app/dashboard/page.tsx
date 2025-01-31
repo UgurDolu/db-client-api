@@ -9,7 +9,7 @@ import {
   Typography,
   CircularProgress,
 } from '@mui/material';
-import { apiClient, Query } from '../../lib/api';
+import { apiClient, Query } from '../../service/api';
 
 interface QueryStats {
   running_queries: number;

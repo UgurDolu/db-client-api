@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiClient, User } from '../lib/api';
+import { apiClient, User } from '../service/api';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   register: (email: string, password: string) => Promise<void>;
 }
@@ -33,8 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const response = await apiClient.auth.login({ username: email, password });
+  const login = async (username: string, password: string) => {
+    const response = await apiClient.auth.login({ username, password });
     const { access_token } = response.data;
     localStorage.setItem('token', access_token);
     const userResponse = await apiClient.users.getProfile();

@@ -14,7 +14,7 @@ import {
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
-import { apiClient, UserSettings } from '../../lib/api';
+import { apiClient, UserSettings } from '../../service/api';
 
 const validationSchema = yup.object({
   export_location: yup.string(),

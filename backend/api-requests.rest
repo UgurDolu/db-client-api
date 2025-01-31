@@ -13,22 +13,22 @@ Content-Type: application/json
 POST http://localhost:8000/api/v1/auth/login
 Content-Type: application/x-www-form-urlencoded
 
-username=deneme@deneme.com&password=deneme
+username=ugur@deneme.com&password=deneme
 
 ### User Management Endpoints
 
 ### Get all users
 GET http://localhost:8000/api/v1/users/profile
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZGVuZW1lLmNvbSIsImV4cCI6MTc0MDkwMDI3MX0.56jQomVeAcdEvwHcZyC9FS4w--XIVJf4juFyHV5J9lE
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 
 ### Get specific user
 GET http://localhost:8000/api/v1/users/settings
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZGVuZW1lLmNvbSIsImV4cCI6MTc0MDkwMDI3MX0.56jQomVeAcdEvwHcZyC9FS4w--XIVJf4juFyHV5J9lE
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 
 ### Update user
 PUT http://localhost:8000/api/v1/users/settings
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZGVuZW1lLmNvbSIsImV4cCI6MTc0MDkwMDI3MX0.56jQomVeAcdEvwHcZyC9FS4w--XIVJf4juFyHV5J9lE
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 
 {
     "export_location": "/home/testuser/deneme",
@@ -45,19 +45,19 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZ
 ### Database Query Endpoints
 
 ### List queries
-GET http://localhost:8000/api/v1/queries/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZGVuZW1lLmNvbSIsImV4cCI6MTc0MDkwMDI3MX0.56jQomVeAcdEvwHcZyC9FS4w--XIVJf4juFyHV5J9lE
+GET http://localhost:8000/api/v1/queries
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 
 ### Post New Query
-POST http://localhost:8000/api/v1/queries/
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZGVuZW1lLmNvbSIsImV4cCI6MTc0MDkwMDI3MX0.56jQomVeAcdEvwHcZyC9FS4w--XIVJf4juFyHV5J9lE
+POST http://localhost:8000/api/v1/queries
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 Content-Type: application/json
 
 {   
     "db_username": "t088503",
     "db_password": "hilaL250202",
     "db_tns": "oracle:1521/XE",
-    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 500"
+    "query_text": "SELECT * FROM example.test_data WHERE ROWNUM <= 50"
 }
 
 
@@ -65,19 +65,19 @@ Content-Type: application/json
 
 ### Get Query Stats
 GET http://localhost:8000/api/queries/243
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZGVuZW1lLmNvbSIsImV4cCI6MTc0MDkwMDI3MX0.56jQomVeAcdEvwHcZyC9FS4w--XIVJf4juFyHV5J9lE
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 
 ### Get Current Stats
 GET http://localhost:8000/api/v1/queries/stats/current
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZGVuZW1lLmNvbSIsImV4cCI6MTc0MDkwMDI3MX0.56jQomVeAcdEvwHcZyC9FS4w--XIVJf4juFyHV5J9lE
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 
 ### Delete Query
 DELETE http://localhost:8000/api/queries/88
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZGVuZW1lLmNvbSIsImV4cCI6MTc0MDkwMDI3MX0.56jQomVeAcdEvwHcZyC9FS4w--XIVJf4juFyHV5J9lE
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 
 ### Batch Rerun Queries
 POST http://localhost:8000/api/queries/batch/rerun
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkZW5lbWVAZGVuZW1lLmNvbSIsImV4cCI6MTc0MDkwMDI3MX0.56jQomVeAcdEvwHcZyC9FS4w--XIVJf4juFyHV5J9lE
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 Content-Type: application/json
 
 {

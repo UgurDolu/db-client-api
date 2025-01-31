@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 const validationSchema = yup.object({
-  email: yup
+  username: yup
     .string()
     .email('Enter a valid email')
     .required('Email is required'),
@@ -33,13 +33,13 @@ export default function LoginPage() {
 
   const formik = useFormik({
     initialValues: {
-      email: '',
+      username: '',
       password: '',
     },
     validationSchema: validationSchema,
     onSubmit: async (values) => {
       try {
-        await login(values.email, values.password);
+        await login(values.username, values.password);
         router.push('/dashboard');
       } catch (error) {
         console.error('Login failed:', error);
@@ -81,15 +81,15 @@ export default function LoginPage() {
               margin="normal"
               required
               fullWidth
-              id="email"
+              id="username"
               label="Email Address"
-              name="email"
+              name="username"
               autoComplete="email"
               autoFocus
-              value={formik.values.email}
+              value={formik.values.username}
               onChange={formik.handleChange}
-              error={formik.touched.email && Boolean(formik.errors.email)}
-              helperText={formik.touched.email && formik.errors.email}
+              error={formik.touched.username && Boolean(formik.errors.username)}
+              helperText={formik.touched.username && formik.errors.username}
             />
             <TextField
               margin="normal"

@@ -23,7 +23,7 @@ import {
 } from '@mui/icons-material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
-import { apiClient, Query } from '../../lib/api';
+import { apiClient, Query } from '../../service/api';
 
 const validationSchema = yup.object({
   query_text: yup.string().required('Query is required'),
