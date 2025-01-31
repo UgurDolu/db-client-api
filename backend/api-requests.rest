@@ -45,11 +45,11 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlb
 ### Database Query Endpoints
 
 ### List queries
-GET http://localhost:8000/api/v1/queries
+GET http://localhost:8000/api/v1/queries/query
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 
 ### Post New Query
-POST http://localhost:8000/api/v1/queries
+POST http://localhost:8000/api/v1/queries/query
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1Z3VyQGRlbmVtZS5jb20iLCJleHAiOjE3NDA5MDQ4NzN9.41BfQXP5Tfn5ycnYpYsZzRgtaMaiaF11_c26pOpaanc
 Content-Type: application/json
 

@@ -17,7 +17,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-@router.post("/", response_model=QuerySchema)
+@router.post("/query", response_model=QuerySchema)
 async def create_query(
     *,
     db: AsyncSession = Depends(get_db),
@@ -60,7 +60,7 @@ async def create_query(
             detail=f"Failed to create query: {str(e)}"
         )
 
-@router.get("/", response_model=List[QuerySchema])
+@router.get("/query", response_model=List[QuerySchema])
 async def list_queries(
     current_user: UserModel = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)

@@ -82,9 +82,9 @@ const users = {
 };
 
 const queries = {
-  list: () => api.get('/queries'),
+  list: () => api.get('/queries/query'),
   create: (query: Omit<Query, 'id' | 'user_id' | 'status' | 'created_at'>) => 
-    api.post('/queries', query),
+    api.post('/queries/query', query),
   getStatus: (queryId: number) => api.get(`/queries/${queryId}`),
   delete: (queryId: number) => api.delete(`/queries/${queryId}`),
   rerun: (queryId: number) => api.post(`/queries/${queryId}/rerun`),
