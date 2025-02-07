@@ -3,7 +3,6 @@ YAPILACAKLAR;
 - Connection with sshkey
 - Dockerize edilebilir PROCESSOR-SERVICE replika olacak
 - TNSNAME ORA ???
-- deneme
 
 
 ### Cursor
